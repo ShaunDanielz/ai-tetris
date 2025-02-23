@@ -13,9 +13,11 @@
         #game-area {
             margin-right: 20px;
         }
-        #game, #next {
+        #game, #next1, #next2, #next3 {
             border: 1px solid #333;
             background-color: #fff;
+            display: block;
+            margin: 5px auto;
         }
         #side-panel {
             width: 200px;
@@ -45,7 +47,9 @@
     <div id="container">
         <div id="game-area">
             <canvas id="game" width="300" height="600"></canvas>
-            <canvas id="next" width="120" height="120"></canvas>
+            <canvas id="next1" width="120" height="120"></canvas>
+            <canvas id="next2" width="120" height="120"></canvas>
+            <canvas id="next3" width="120" height="120"></canvas>
         </div>
         <div id="side-panel">
             <h2>Controls</h2>
@@ -96,7 +100,7 @@
         const CELL_SIZE = 30;
         let grid = Array(GRID_HEIGHT).fill().map(() => Array(GRID_WIDTH).fill(''));
         let currentTetromino = null;
-        let nextTetromino = null;
+        let upcomingTetrominoes = [];  // Array to hold the next three tetrominoes
         let score = 0;
         let level = 1;
         let linesCleared = 0;
@@ -112,9 +116,13 @@
 
         // Canvas setup
         const gameCanvas = document.getElementById('game');
-        const nextCanvas = document.getElementById('next');
+        const next1Canvas = document.getElementById('next1');
+        const next2Canvas = document.getElementById('next2');
+        const next3Canvas = document.getElementById('next3');
         const gameCtx = gameCanvas.getContext('2d');
-        const nextCtx = nextCanvas.getContext('2d');
+        const next1Ctx = next1Canvas.getContext('2d');
+        const next2Ctx = next2Canvas.getContext('2d');
+        const next3Ctx = next3Canvas.getContext('2d');
 
         // DOM elements
         const levelDisplay = document.getElementById('level');
@@ -194,8 +202,12 @@
         }
 
         function drawNextTetromino() {
-            nextCtx.clearRect(0, 0, nextCanvas.width, nextCanvas.height);
-            drawTetromino(nextCtx, nextTetromino, 0, 0);
+            next1Ctx.clearRect(0, 0, next1Canvas.width, next1Canvas.height);
+            drawTetromino(next1Ctx, upcomingTetrominoes[0], 0, 0);
+            next2Ctx.clearRect(0, 0, next2Canvas.width, next2Canvas.height);
+            drawTetromino(next2Ctx, upcomingTetrominoes[1], 0, 0);
+            next3Ctx.clearRect(0, 0, next3Canvas.width, next3Canvas.height);
+            drawTetromino(next3Ctx, upcomingTetrominoes[2], 0, 0);
         }
 
         function render() {
@@ -325,8 +337,8 @@
         }
 
         function generateNewTetromino() {
-            currentTetromino = nextTetromino;
-            nextTetromino = generateTetromino();
+            currentTetromino = upcomingTetrominoes.shift(); // Take the first tetromino from the queue
+            upcomingTetrominoes.push(generateTetromino());  // Add a new one to the end
             if (checkCollision(currentTetromino.x, currentTetromino.y, currentTetromino.shapes[currentTetromino.orientation])) {
                 endGame();
             }
@@ -356,8 +368,8 @@
             fallInterval = 1000;
             gameOver = false;
             gameOverDisplay.style.display = 'none';
+            upcomingTetrominoes = [generateTetromino(), generateTetromino(), generateTetromino()];
             currentTetromino = generateTetromino();
-            nextTetromino = generateTetromino();
             if (aiMode) {
                 clearInterval(aiInterval);
                 aiInterval = setInterval(aiStep, parseInt(speedSlider.value));
@@ -630,8 +642,8 @@
         });
 
         // Initialize game
+        upcomingTetrominoes = [generateTetromino(), generateTetromino(), generateTetromino()];
         currentTetromino = generateTetromino();
-        nextTetromino = generateTetromino();
         requestAnimationFrame(gameLoop);
     </script>
 </body>
