@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tetris with AI</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+    <style>
+        #container {
+            display: flex;
+            font-family: Arial, sans-serif;
+        }
+        #game-area {
+            margin-right: 20px;
+        }
+        #game, #next {
+            border: 1px solid #333;
+            background-color: #fff;
+        }
+        #side-panel {
+            width: 200px;
+        }
+        h2 {
+            font-size: 18px;
+            margin: 10px 0;
+        }
+        p {
+            margin: 5px 0;
+        }
+        .blink {
+            animation: blink 0.5s infinite;
+        }
+        @keyframes blink {
+            50% { opacity: 0; }
+        }
+        #ai-controls {
+            margin-top: 10px;
+        }
+        #speed-slider {
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="game-area">
+            <canvas id="game" width="300" height="600"></canvas>
+            <canvas id="next" width="120" height="120"></canvas>
+        </div>
+        <div id="side-panel">
+            <h2>Controls</h2>
+            <p>Left Arrow: Move Left</p>
+            <p>Right Arrow: Move Right</p>
+            <p>Down Arrow: Move Down</p>
+            <p>Up Arrow: Rotate</p>
+            <p>Space: Hard Drop</p>
+            <h2>Tips</h2>
+            <p>Fill rows completely to clear them.</p>
+            <p>Plan ahead with the next tetromino.</p>
+            <p>Stack efficiently to avoid gaps.</p>
+            <h2>Stats</h2>
+            <p>Level: <span id="level">1</span></p>
+            <p>Lines to Next: <span id="lines-to-next">10</span></p>
+            <p>Score: <span id="score">0</span></p>
+            <p>High Score: <span id="high-score">0</span></p>
+            <p>Episode: <span id="episode">0</span></p>
+            <p>Episode Reward: <span id="episode-reward">0</span></p>
+            <p id="game-over" style="color: red; display: none;">Game Over! <span class="blink">Press Enter to Restart</span></p>
+            <div id="ai-controls">
+                <h2>AI Controls</h2>
+                <button id="ai-toggle">Toggle AI (Off)</button>
+                <p>AI Speed: <input type="range" id="speed-slider" min="50" max="2000" value="500"></p>
+                <button id="save-model">Save Model</button>
+                <button id="load-model">Load Model</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Tetromino definitions with shapes for each orientation
+        const TETROMINOES = {
+            'I': { shapes: [[[0,0,0,0], [1,1,1,1], [0,0,0,0], [0,0,0,0]], [[0,0,1,0], [0,0,1,0], [0,0,1,0], [0,0,1,0]], [[0,0,0,0], [0,0,0,0], [1,1,1,1], [0,0,0,0]], [[0,1,0,0], [0,1,0,0], [0,1,0,0], [0,1,0,0]]] },
+            'O': { shapes: [[[0,0,0,0], [0,1,1,0], [0,1,1,0], [0,0,0,0]]] },
+            'T': { shapes: [[[0,1,0,0], [1,1,1,0], [0,0,0,0], [0,0,0,0]], [[0,1,0,0], [0,1,1,0], [0,1,0,0], [0,0,0,0]], [[0,0,0,0], [1,1,1,0], [0,1,0,0], [0,0,0,0]], [[0,1,0,0], [1,1,0,0], [0,1,0,0], [0,0,0,0]]] },
+            'S': { shapes: [[[0,1,1,0], [1,1,0,0], [0,0,0,0], [0,0,0,0]], [[0,1,0,0], [0,1,1,0], [0,0,1,0], [0,0,0,0]], [[0,0,0,0], [0,1,1,0], [1,1,0,0], [0,0,0,0]], [[1,0,0,0], [1,1,0,0], [0,1,0,0], [0,0,0,0]]] },
+            'Z': { shapes: [[[1,1,0,0], [0,1,1,0], [0,0,0,0], [0,0,0,0]], [[0,0,1,0], [0,1,1,0], [0,1,0,0], [0,0,0,0]], [[0,0,0,0], [1,1,0,0], [0,1,1,0], [0,0,0,0]], [[0,1,0,0], [1,1,0,0], [1,0,0,0], [0,0,0,0]]] },
+            'J': { shapes: [[[1,0,0,0], [1,1,1,0], [0,0,0,0], [0,0,0,0]], [[0,1,1,0], [0,1,0,0], [0,1,0,0], [0,0,0,0]], [[0,0,0,0], [1,1,1,0], [0,0,1,0], [0,0,0,0]], [[0,1,0,0], [0,1,0,0], [1,1,0,0], [0,0,0,0]]] },
+            'L': { shapes: [[[0,0,1,0], [1,1,1,0], [0,0,0,0], [0,0,0,0]], [[0,1,0,0], [0,1,0,0], [0,1,1,0], [0,0,0,0]], [[0,0,0,0], [1,1,1,0], [1,0,0,0], [0,0,0,0]], [[1,1,0,0], [0,1,0,0], [0,1,0,0], [0,0,0,0]]] }
+        };
+
+        const COLORS = ['#4477AA', '#EE7733', '#228833', '#CCBB44', '#AA3377', '#BBBBBB', '#66CCEE', '#EE6677'];
+
+        // Game state variables
+        const GRID_WIDTH = 10;
+        const GRID_HEIGHT = 20;
+        const CELL_SIZE = 30;
+        let grid = Array(GRID_HEIGHT).fill().map(() => Array(GRID_WIDTH).fill(''));
+        let currentTetromino = null;
+        let nextTetromino = null;
+        let score = 0;
+        let level = 1;
+        let linesCleared = 0;
+        let linesPerLevel = 10;
+        let fallInterval = 1000;
+        let lastFallTime = 0;
+        let gameOver = false;
+        let highScore = localStorage.getItem('tetrisHighScore') || 0;
+        let episode = 0;
+        let aiMode = false;
+        let aiInterval;
+        let episodeReward = 0;  // Track cumulative reward per episode
+
+        // Canvas setup
+        const gameCanvas = document.getElementById('game');
+        const nextCanvas = document.getElementById('next');
+        const gameCtx = gameCanvas.getContext('2d');
+        const nextCtx = nextCanvas.getContext('2d');
+
+        // DOM elements
+        const levelDisplay = document.getElementById('level');
+        const linesToNextDisplay = document.getElementById('lines-to-next');
+        const scoreDisplay = document.getElementById('score');
+        const highScoreDisplay = document.getElementById('high-score');
+        const episodeDisplay = document.getElementById('episode');
+        const episodeRewardDisplay = document.getElementById('episode-reward');
+        const gameOverDisplay = document.getElementById('game-over');
+        const aiToggleButton = document.getElementById('ai-toggle');
+        const speedSlider = document.getElementById('speed-slider');
+        const saveModelButton = document.getElementById('save-model');
+        const loadModelButton = document.getElementById('load-model');
+        highScoreDisplay.textContent = highScore;
+
+        // Audio setup
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playSound(frequency, duration) {
+            const oscillator = audioCtx.createOscillator();
+            oscillator.type = 'square';
+            oscillator.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+            oscillator.connect(audioCtx.destination);
+            oscillator.start();
+            oscillator.stop(audioCtx.currentTime + duration);
+        }
+
+        // Tetromino generation
+        function generateTetromino() {
+            const types = Object.keys(TETROMINOES);
+            const type = types[Math.floor(Math.random() * types.length)];
+            const shapes = TETROMINOES[type].shapes;
+            const availableColors = COLORS.slice(0, 2 + level);
+            const color = availableColors[Math.floor(Math.random() * availableColors.length)];
+            return {
+                type,
+                shapes,
+                orientation: 0,
+                color,
+                x: Math.floor(GRID_WIDTH / 2) - 2,
+                y: 0
+            };
+        }
+
+        // Rendering functions
+        function drawCell(ctx, x, y, color) {
+            ctx.fillStyle = color;
+            ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE - 1, CELL_SIZE - 1);
+            ctx.strokeStyle = '#333';
+            ctx.strokeRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE - 1, CELL_SIZE - 1);
+        }
+
+        function drawGrid() {
+            gameCtx.fillStyle = '#fff';
+            gameCtx.fillRect(0, 0, gameCanvas.width, gameCanvas.height);
+            for (let row = 0; row < GRID_HEIGHT; row++) {
+                for (let col = 0; col < GRID_WIDTH; col++) {
+                    if (grid[row][col]) {
+                        drawCell(gameCtx, col, row, grid[row][col]);
+                    } else {
+                        gameCtx.strokeStyle = '#ccc';
+                        gameCtx.strokeRect(col * CELL_SIZE, row * CELL_SIZE, CELL_SIZE - 1, CELL_SIZE - 1);
+                    }
+                }
+            }
+        }
+
+        function drawTetromino(ctx, tetromino, offsetX, offsetY) {
+            const shape = tetromino.shapes[tetromino.orientation];
+            for (let row = 0; row < 4; row++) {
+                for (let col = 0; col < 4; col++) {
+                    if (shape[row][col]) {
+                        drawCell(ctx, offsetX + col, offsetY + row, tetromino.color);
+                    }
+                }
+            }
+        }
+
+        function drawNextTetromino() {
+            nextCtx.clearRect(0, 0, nextCanvas.width, nextCanvas.height);
+            drawTetromino(nextCtx, nextTetromino, 0, 0);
+        }
+
+        function render() {
+            drawGrid();
+            if (currentTetromino) {
+                drawTetromino(gameCtx, currentTetromino, currentTetromino.x, currentTetromino.y);
+            }
+            drawNextTetromino();
+            scoreDisplay.textContent = score;
+            levelDisplay.textContent = level;
+            linesToNextDisplay.textContent = linesPerLevel - (linesCleared % linesPerLevel);
+            episodeDisplay.textContent = episode;
+            episodeRewardDisplay.textContent = episodeReward;
+        }
+
+        // Collision detection
+        function checkCollision(x, y, shape) {
+            for (let row = 0; row < 4; row++) {
+                for (let col = 0; col < 4; col++) {
+                    if (shape[row][col]) {
+                        const newX = x + col;
+                        const newY = y + row;
+                        if (newX < 0 || newX >= GRID_WIDTH || newY >= GRID_HEIGHT || (newY >= 0 && grid[newY][newX])) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        // For state-based collision detection
+        function checkCollisionState(board, x, y, shape) {
+            for (let row = 0; row < 4; row++) {
+                for (let col = 0; col < 4; col++) {
+                    if (shape[row][col]) {
+                        const newX = x + col;
+                        const newY = y + row;
+                        if (newX < 0 || newX >= GRID_WIDTH || newY >= GRID_HEIGHT || (newY >= 0 && board[newY][newX])) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        // Tetromino movement
+        function moveDown() {
+            if (!checkCollision(currentTetromino.x, currentTetromino.y + 1, currentTetromino.shapes[currentTetromino.orientation])) {
+                currentTetromino.y++;
+            } else {
+                lockTetromino();
+                generateNewTetromino();
+            }
+        }
+
+        function moveLeft() {
+            if (!checkCollision(currentTetromino.x - 1, currentTetromino.y, currentTetromino.shapes[currentTetromino.orientation])) {
+                currentTetromino.x--;
+            }
+        }
+
+        function moveRight() {
+            if (!checkCollision(currentTetromino.x + 1, currentTetromino.y, currentTetromino.shapes[currentTetromino.orientation])) {
+                currentTetromino.x++;
+            }
+        }
+
+        function rotate() {
+            const newOrientation = (currentTetromino.orientation + 1) % currentTetromino.shapes.length;
+            if (!checkCollision(currentTetromino.x, currentTetromino.y, currentTetromino.shapes[newOrientation])) {
+                currentTetromino.orientation = newOrientation;
+                playSound(800, 0.1);
+            }
+        }
+
+        function hardDrop() {
+            while (!checkCollision(currentTetromino.x, currentTetromino.y + 1, currentTetromino.shapes[currentTetromino.orientation])) {
+                currentTetromino.y++;
+            }
+            lockTetromino();
+            generateNewTetromino();
+            playSound(600, 0.2);
+        }
+
+        function lockTetromino() {
+            const shape = currentTetromino.shapes[currentTetromino.orientation];
+            for (let row = 0; row < 4; row++) {
+                for (let col = 0; col < 4; col++) {
+                    if (shape[row][col]) {
+                        const gridX = currentTetromino.x + col;
+                        const gridY = currentTetromino.y + row;
+                        if (gridY >= 0) {
+                            grid[gridY][gridX] = currentTetromino.color;
+                        }
+                    }
+                }
+            }
+            const lines = clearLines();
+            score += [0, 100, 300, 500, 800][lines];
+            linesCleared += lines;
+            playSound(500, 0.3);
+            if (linesCleared >= linesPerLevel * level) {
+                levelUp();
+            }
+            return lines;
+        }
+
+        function clearLines() {
+            let lines = 0;
+            for (let row = GRID_HEIGHT - 1; row >= 0; row--) {
+                if (grid[row].every(cell => cell)) {
+                    grid.splice(row, 1);
+                    grid.unshift(Array(GRID_WIDTH).fill(''));
+                    lines++;
+                    row++;
+                }
+            }
+            return lines;
+        }
+
+        function levelUp() {
+            level++;
+            fallInterval = Math.max(100, 1000 - 100 * (level - 1));
+            playSound(1000, 0.5);
+        }
+
+        function generateNewTetromino() {
+            currentTetromino = nextTetromino;
+            nextTetromino = generateTetromino();
+            if (checkCollision(currentTetromino.x, currentTetromino.y, currentTetromino.shapes[currentTetromino.orientation])) {
+                endGame();
+            }
+        }
+
+        function endGame() {
+            gameOver = true;
+            gameOverDisplay.style.display = 'block';
+            playSound(400, 0.2);
+            setTimeout(() => playSound(300, 0.2), 200);
+            setTimeout(() => playSound(200, 0.2), 400);
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('tetrisHighScore', highScore);
+                highScoreDisplay.textContent = highScore;
+            }
+            episode++;
+            // Reset episode cumulative reward at the end of each episode.
+            episodeReward = 0;
+        }
+
+        function resetGame() {
+            grid = Array(GRID_HEIGHT).fill().map(() => Array(GRID_WIDTH).fill(''));
+            score = 0;
+            level = 1;
+            linesCleared = 0;
+            fallInterval = 1000;
+            gameOver = false;
+            gameOverDisplay.style.display = 'none';
+            currentTetromino = generateTetromino();
+            nextTetromino = generateTetromino();
+            if (aiMode) {
+                clearInterval(aiInterval);
+                aiInterval = setInterval(aiStep, parseInt(speedSlider.value));
+            } else {
+                lastFallTime = performance.now();
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        // Game loop for manual play
+        function gameLoop(timestamp) {
+            if (gameOver) return;
+            if (aiMode) {
+                clearInterval(aiInterval);
+                aiInterval = setInterval(aiStep, parseInt(speedSlider.value));
+                return;
+            }
+            if (timestamp - lastFallTime >= fallInterval) {
+                moveDown();
+                lastFallTime = timestamp;
+            }
+            render();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // --- AI Setup ---
+        // New STATE_SIZE: grid (200) + tetromino type (7) + position and orientation (3) = 210
+        const STATE_SIZE = GRID_HEIGHT * GRID_WIDTH + 7 + 3;
+        const NUM_ACTIONS = 40;     // 4 rotations * 10 x positions
+        const model = tf.sequential();
+        model.add(tf.layers.dense({units: 256, activation: 'relu', inputShape: [STATE_SIZE]}));
+        model.add(tf.layers.dense({units: 256, activation: 'relu'}));
+        model.add(tf.layers.dense({units: NUM_ACTIONS}));
+        model.compile({optimizer: 'adam', loss: 'meanSquaredError'});
+
+        const targetModel = tf.sequential();
+        targetModel.add(tf.layers.dense({units: 256, activation: 'relu', inputShape: [STATE_SIZE]}));
+        targetModel.add(tf.layers.dense({units: 256, activation: 'relu'}));
+        targetModel.add(tf.layers.dense({units: NUM_ACTIONS}));
+        targetModel.setWeights(model.getWeights());
+
+        const replayBuffer = [];
+        const MAX_BUFFER_SIZE = 10000;
+        const BATCH_SIZE = 32;
+        let epsilon = 1.0;
+        const EPSILON_MIN = 0.01;
+        const EPSILON_DECAY = 0.995;
+        const GAMMA = 0.99;
+        let stepCount = 0;
+
+        // Enhanced state representation: including tetromino x, y and orientation
+        function getStateVector() {
+            const boardFlat = grid.flat().map(cell => cell ? 1 : 0);
+            const tetrominoOneHot = Array(7).fill(0);
+            const types = Object.keys(TETROMINOES);
+            tetrominoOneHot[types.indexOf(currentTetromino.type)] = 1;
+            const posAndOrient = [
+                currentTetromino.x / GRID_WIDTH,
+                currentTetromino.y / GRID_HEIGHT,
+                currentTetromino.shapes.length > 0 ? currentTetromino.orientation / currentTetromino.shapes.length : 0
+            ];
+            return boardFlat.concat(tetrominoOneHot, posAndOrient);
+        }
+
+        function getStateVectorFromExperience(state) {
+            const boardFlat = state.board.flat().map(cell => cell ? 1 : 0);
+            const tetrominoOneHot = Array(7).fill(0);
+            const types = Object.keys(TETROMINOES);
+            tetrominoOneHot[types.indexOf(state.tetromino.type)] = 1;
+            const posAndOrient = [
+                state.tetromino.x / GRID_WIDTH,
+                state.tetromino.y / GRID_HEIGHT,
+                state.tetromino.shapes.length > 0 ? state.tetromino.orientation / state.tetromino.shapes.length : 0
+            ];
+            return boardFlat.concat(tetrominoOneHot, posAndOrient);
+        }
+
+        // Count holes on a given board (hole: an empty cell with a filled cell above)
+        function countHolesForBoard(board) {
+            let holes = 0;
+            for (let col = 0; col < GRID_WIDTH; col++) {
+                let blockFound = false;
+                for (let row = 0; row < GRID_HEIGHT; row++) {
+                    if (board[row][col]) {
+                        blockFound = true;
+                    } else if (blockFound && !board[row][col]) {
+                        holes++;
+                    }
+                }
+            }
+            return holes;
+        }
+
+        // Compute valid actions based on the current live state
+        function getValidActions() {
+            const validActions = [];
+            for (let rotation = 0; rotation < currentTetromino.shapes.length; rotation++) {
+                for (let x = 0; x < GRID_WIDTH; x++) {
+                    let y = 0;
+                    while (!checkCollision(currentTetromino.x = x, y + 1, currentTetromino.shapes[rotation])) {
+                        y++;
+                    }
+                    if (!checkCollision(x, y, currentTetromino.shapes[rotation])) {
+                        const actionIndex = rotation * 10 + x;
+                        validActions.push({index: actionIndex, rotation, x, y});
+                    }
+                }
+            }
+            return validActions;
+        }
+
+        // Compute valid actions from a provided state (using state.board and state.tetromino)
+        function getValidActionsFromState(state) {
+            const validActions = [];
+            for (let rotation = 0; rotation < state.tetromino.shapes.length; rotation++) {
+                for (let x = 0; x < GRID_WIDTH; x++) {
+                    let y = 0;
+                    while (!checkCollisionState(state.board, x, y + 1, state.tetromino.shapes[rotation])) {
+                        y++;
+                    }
+                    if (!checkCollisionState(state.board, x, y, state.tetromino.shapes[rotation])) {
+                        const actionIndex = rotation * 10 + x;
+                        validActions.push({index: actionIndex, rotation, x, y});
+                    }
+                }
+            }
+            return validActions;
+        }
+
+        function selectAction() {
+            const validActions = getValidActions();
+            if (Math.random() < epsilon) {
+                return validActions[Math.floor(Math.random() * validActions.length)];
+            }
+            const stateVector = getStateVector();
+            const stateTensor = tf.tensor2d([stateVector], [1, STATE_SIZE]);
+            const qValues = model.predict(stateTensor).dataSync();
+            let maxQ = -Infinity;
+            let bestAction = validActions[0];
+            validActions.forEach(action => {
+                if (qValues[action.index] > maxQ) {
+                    maxQ = qValues[action.index];
+                    bestAction = action;
+                }
+            });
+            tf.dispose(stateTensor);
+            return bestAction;
+        }
+
+        function storeExperience(state, action, reward, nextState, done) {
+            const experience = {state, action: action.index, reward, nextState, done};
+            if (replayBuffer.length >= MAX_BUFFER_SIZE) {
+                replayBuffer.shift();
+            }
+            replayBuffer.push(experience);
+        }
+
+        async function trainModel() {
+            if (replayBuffer.length < BATCH_SIZE) return;
+            const batchIndices = Array.from({length: BATCH_SIZE}, () => Math.floor(Math.random() * replayBuffer.length));
+            const batch = batchIndices.map(i => replayBuffer[i]);
+
+            const states = batch.map(exp => getStateVectorFromExperience(exp.state));
+            const nextStates = batch.map(exp => getStateVectorFromExperience(exp.nextState));
+            const stateTensor = tf.tensor2d(states, [BATCH_SIZE, STATE_SIZE]);
+            const nextStateTensor = tf.tensor2d(nextStates, [BATCH_SIZE, STATE_SIZE]);
+
+            const qValues = model.predict(stateTensor);
+            const qValuesNext = targetModel.predict(nextStateTensor).dataSync();
+            const targets = qValues.dataSync().slice();
+
+            batch.forEach((exp, i) => {
+                const offset = i * NUM_ACTIONS;
+                const validNextActions = getValidActionsFromState(exp.nextState);
+                let maxNextQ = -Infinity;
+                validNextActions.forEach(action => {
+                    if (qValuesNext[offset + action.index] > maxNextQ) {
+                        maxNextQ = qValuesNext[offset + action.index];
+                    }
+                });
+                const target = exp.done ? exp.reward : exp.reward + GAMMA * maxNextQ;
+                targets[offset + exp.action] = target;
+            });
+
+            await model.fit(stateTensor, tf.tensor2d(targets, [BATCH_SIZE, NUM_ACTIONS]), {epochs: 1, verbose: 0});
+            tf.dispose([stateTensor, nextStateTensor, qValues]);
+            if (stepCount % 1000 === 0) {
+                targetModel.setWeights(model.getWeights());
+            }
+        }
+
+        function aiStep() {
+            if (gameOver) {
+                clearInterval(aiInterval);
+                resetGame();
+                return;
+            }
+
+            // Save the current state
+            const state = {board: grid.map(row => [...row]), tetromino: {...currentTetromino}};
+            const action = selectAction();
+            // Execute selected action
+            currentTetromino.orientation = action.rotation;
+            currentTetromino.x = action.x;
+            currentTetromino.y = action.y;
+            const lines = lockTetromino();
+            generateNewTetromino();
+
+            // Calculate penalty for holes and game over penalty
+            const holes = countHolesForBoard(grid);
+            let reward = (lines * lines * 10) - (holes * 2);
+            if (gameOver) reward = -100;
+            episodeReward += reward;
+
+            const nextState = {board: grid.map(row => [...row]), tetromino: {...currentTetromino}};
+            storeExperience(state, action, reward, nextState, gameOver);
+            stepCount++;
+            if (stepCount % 5 === 0) trainModel();
+            epsilon = Math.max(EPSILON_MIN, epsilon * EPSILON_DECAY);
+            render();
+        }
+
+        // Event handling
+        document.addEventListener('keydown', (e) => {
+            if (gameOver && e.key === 'Enter') {
+                resetGame();
+                return;
+            }
+            if (gameOver || aiMode) return;
+            switch (e.key) {
+                case 'ArrowLeft': moveLeft(); break;
+                case 'ArrowRight': moveRight(); break;
+                case 'ArrowDown': moveDown(); break;
+                case 'ArrowUp': rotate(); break;
+                case ' ': hardDrop(); break;
+            }
+            render();
+        });
+
+        aiToggleButton.addEventListener('click', () => {
+            aiMode = !aiMode;
+            aiToggleButton.textContent = `Toggle AI (${aiMode ? 'On' : 'Off'})`;
+            if (aiMode) {
+                clearInterval(aiInterval);
+                aiInterval = setInterval(aiStep, parseInt(speedSlider.value));
+            } else {
+                clearInterval(aiInterval);
+                lastFallTime = performance.now();
+                requestAnimationFrame(gameLoop);
+            }
+        });
+
+        speedSlider.addEventListener('input', () => {
+            if (aiMode) {
+                clearInterval(aiInterval);
+                aiInterval = setInterval(aiStep, parseInt(speedSlider.value));
+            }
+        });
+
+        saveModelButton.addEventListener('click', async () => {
+            await model.save('localstorage://tetris-model');
+            alert('Model saved successfully!');
+        });
+
+        loadModelButton.addEventListener('click', async () => {
+            const loadedModel = await tf.loadLayersModel('localstorage://tetris-model');
+            model.setWeights(loadedModel.getWeights());
+            targetModel.setWeights(loadedModel.getWeights());
+            alert('Model loaded successfully!');
+        });
+
+        // Initialize game
+        currentTetromino = generateTetromino();
+        nextTetromino = generateTetromino();
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>
