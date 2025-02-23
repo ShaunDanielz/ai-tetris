@@ -66,6 +66,7 @@
             <p>Level: <span id="level">1</span></p>
             <p>Lines to Next: <span id="lines-to-next">10</span></p>
             <p>Score: <span id="score">0</span></p>
+            <p>Total Score: <span id="total-score">0</span></p>
             <p>High Score: <span id="high-score">0</span></p>
             <p>Episode: <span id="episode">0</span></p>
             <p>Episode Reward: <span id="episode-reward">0</span></p>
@@ -102,6 +103,7 @@
         let currentTetromino = null;
         let upcomingTetrominoes = [];  // Array to hold the next three tetrominoes
         let score = 0;
+        let totalScore = 0;  // Cumulative score across episodes
         let level = 1;
         let linesCleared = 0;
         let linesPerLevel = 10;
@@ -128,6 +130,7 @@
         const levelDisplay = document.getElementById('level');
         const linesToNextDisplay = document.getElementById('lines-to-next');
         const scoreDisplay = document.getElementById('score');
+        const totalScoreDisplay = document.getElementById('total-score');  // New display for total score
         const highScoreDisplay = document.getElementById('high-score');
         const episodeDisplay = document.getElementById('episode');
         const episodeRewardDisplay = document.getElementById('episode-reward');
@@ -217,6 +220,7 @@
             }
             drawNextTetromino();
             scoreDisplay.textContent = score;
+            totalScoreDisplay.textContent = totalScore;  // Update total score display
             levelDisplay.textContent = level;
             linesToNextDisplay.textContent = linesPerLevel - (linesCleared % linesPerLevel);
             episodeDisplay.textContent = episode;
@@ -308,7 +312,9 @@
                 }
             }
             const lines = clearLines();
-            score += [0, 100, 300, 500, 800][lines];
+            const pointsEarned = [0, 100, 300, 500, 800][lines];
+            score += pointsEarned;
+            totalScore += pointsEarned;  // Update total score
             linesCleared += lines;
             playSound(500, 0.3);
             if (linesCleared >= linesPerLevel * level) {
@@ -372,7 +378,7 @@
             currentTetromino = generateTetromino();
             if (aiMode) {
                 clearInterval(aiInterval);
-                aiInterval = setInterval(aiStep, parseInt(speedSlider.value));
+                aiInterval = setInterval(aiStep, 2050 - parseInt(speedSlider.value));  // Inverted interval
             } else {
                 lastFallTime = performance.now();
                 requestAnimationFrame(gameLoop);
@@ -384,7 +390,7 @@
             if (gameOver) return;
             if (aiMode) {
                 clearInterval(aiInterval);
-                aiInterval = setInterval(aiStep, parseInt(speedSlider.value));
+                aiInterval = setInterval(aiStep, 2050 - parseInt(speedSlider.value));  // Inverted interval
                 return;
             }
             if (timestamp - lastFallTime >= fallInterval) {
@@ -396,8 +402,7 @@
         }
 
         // --- AI Setup ---
-        // New STATE_SIZE: grid (200) + tetromino type (7) + position and orientation (3) = 210
-        const STATE_SIZE = GRID_HEIGHT * GRID_WIDTH + 7 + 3;
+        const STATE_SIZE = GRID_HEIGHT * GRID_WIDTH + 7 + 3 + 7 * 3; // 200 + 7 + 3 + 21 = 231
         const NUM_ACTIONS = 40;     // 4 rotations * 10 x positions
         const model = tf.sequential();
         model.add(tf.layers.dense({units: 256, activation: 'relu', inputShape: [STATE_SIZE]}));
@@ -420,7 +425,7 @@
         const GAMMA = 0.99;
         let stepCount = 0;
 
-        // Enhanced state representation: including tetromino x, y and orientation
+        // Enhanced state representation: including tetromino x, y, orientation, and next three tetrominoes
         function getStateVector() {
             const boardFlat = grid.flat().map(cell => cell ? 1 : 0);
             const tetrominoOneHot = Array(7).fill(0);
@@ -431,7 +436,12 @@
                 currentTetromino.y / GRID_HEIGHT,
                 currentTetromino.shapes.length > 0 ? currentTetromino.orientation / currentTetromino.shapes.length : 0
             ];
-            return boardFlat.concat(tetrominoOneHot, posAndOrient);
+            const upcomingOneHots = upcomingTetrominoes.map(t => {
+                const oneHot = Array(7).fill(0);
+                oneHot[types.indexOf(t.type)] = 1;
+                return oneHot;
+            }).flat();
+            return boardFlat.concat(tetrominoOneHot, posAndOrient, upcomingOneHots);
         }
 
         function getStateVectorFromExperience(state) {
@@ -444,7 +454,12 @@
                 state.tetromino.y / GRID_HEIGHT,
                 state.tetromino.shapes.length > 0 ? state.tetromino.orientation / state.tetromino.shapes.length : 0
             ];
-            return boardFlat.concat(tetrominoOneHot, posAndOrient);
+            const upcomingOneHots = state.upcomingTypes.map(type => {
+                const oneHot = Array(7).fill(0);
+                oneHot[types.indexOf(type)] = 1;
+                return oneHot;
+            }).flat();
+            return boardFlat.concat(tetrominoOneHot, posAndOrient, upcomingOneHots);
         }
 
         // Count holes on a given board (hole: an empty cell with a filled cell above)
@@ -569,7 +584,11 @@
             }
 
             // Save the current state
-            const state = {board: grid.map(row => [...row]), tetromino: {...currentTetromino}};
+            const state = {
+                board: grid.map(row => [...row]),
+                tetromino: {...currentTetromino},
+                upcomingTypes: upcomingTetrominoes.map(t => t.type)
+            };
             const action = selectAction();
             // Execute selected action
             currentTetromino.orientation = action.rotation;
@@ -584,7 +603,11 @@
             if (gameOver) reward = -100;
             episodeReward += reward;
 
-            const nextState = {board: grid.map(row => [...row]), tetromino: {...currentTetromino}};
+            const nextState = {
+                board: grid.map(row => [...row]),
+                tetromino: {...currentTetromino},
+                upcomingTypes: upcomingTetrominoes.map(t => t.type)
+            };
             storeExperience(state, action, reward, nextState, gameOver);
             stepCount++;
             if (stepCount % 5 === 0) trainModel();
@@ -614,7 +637,7 @@
             aiToggleButton.textContent = `Toggle AI (${aiMode ? 'On' : 'Off'})`;
             if (aiMode) {
                 clearInterval(aiInterval);
-                aiInterval = setInterval(aiStep, parseInt(speedSlider.value));
+                aiInterval = setInterval(aiStep, 2050 - parseInt(speedSlider.value));  // Inverted interval
             } else {
                 clearInterval(aiInterval);
                 lastFallTime = performance.now();
@@ -625,7 +648,7 @@
         speedSlider.addEventListener('input', () => {
             if (aiMode) {
                 clearInterval(aiInterval);
-                aiInterval = setInterval(aiStep, parseInt(speedSlider.value));
+                aiInterval = setInterval(aiStep, 2050 - parseInt(speedSlider.value));  // Inverted interval
             }
         });
 
