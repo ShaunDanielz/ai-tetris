@@ -1,4 +1,4 @@
-# ai_trainer_full.p
+# ai_trainer_full.pt
 
 import numpy as np
 import tensorflow as tf
@@ -929,7 +929,7 @@ class VisualTetrisDQNTrainer:
         
         # Screen dimensions
         self.window_width = 1280
-        self.window_height = 800
+        self.window_height = 900  # FIXED: Increased height to show all game stats
         self.tetris_width = 300
         self.tetris_height = 600
         self.block_size = 30
@@ -992,6 +992,7 @@ class VisualTetrisDQNTrainer:
         self.state = None
         self.episode = 0
         self.step_count = 0
+        self.player = None  # Added for tracking current piece
         
         # UI elements
         self.ui_elements = []
@@ -1060,8 +1061,8 @@ class VisualTetrisDQNTrainer:
         self.ui_elements.append(CheckBox(600, 230, 20, "Auto-Save Every 100 Episodes", True, 
                                        self.toggle_autosave))
         
-        # Frame skip slider (for speed)
-        self.ui_elements.append(Slider(800, 230, 250, 10, 0, 10, 0, 
+        # Frame skip slider (for speed) - FIXED: Moved to a new line
+        self.ui_elements.append(Slider(420, 260, 250, 10, 0, 10, 0, 
                                       "Frame Skip", self.set_frame_skip))
     
     def set_training_speed(self, value):
@@ -1114,6 +1115,18 @@ class VisualTetrisDQNTrainer:
         """Reset the environment for a new episode"""
         self.state = self.env.reset()
         self.step_count = 0
+        
+        # FIXED: Make sure the current player state reflects the new piece
+        if not self.env.game_over:
+            # Update player to show the new piece properly
+            tetro_shape = self.env.current_piece
+            tetro_color = self.env.piece_colors.get(np.max(tetro_shape), COLORBLIND_COLORS[0])
+            self.player = {
+                'pos': self.env.current_pos.copy(),
+                'tetromino': tetro_shape.copy(),
+                'color': tetro_color,
+                'collided': False
+            }
     
     def save_model_auto(self):
         """Auto-save model with fixed name for continuity"""
@@ -1391,7 +1404,7 @@ class VisualTetrisDQNTrainer:
     def render_metrics_tab(self):
         """Render content for the Metrics tab"""
         metrics_x = 420
-        metrics_y = 260
+        metrics_y = 290  # FIXED: Moved down to avoid overlapping with Frame Skip slider
         
         # Draw plots
         plot_width = 360
@@ -1420,7 +1433,7 @@ class VisualTetrisDQNTrainer:
     def render_network_tab(self):
         """Render content for the Network tab"""
         network_x = 420
-        network_y = 260
+        network_y = 290  # FIXED: Moved down to avoid overlapping with Frame Skip slider
         
         # Draw neural network structure
         nn_width = 740
@@ -1519,7 +1532,7 @@ class VisualTetrisDQNTrainer:
     def render_board_analysis_tab(self):
         """Render content for the Board Analysis tab"""
         analysis_x = 420
-        analysis_y = 260
+        analysis_y = 290  # FIXED: Moved down to avoid overlapping with Frame Skip slider
         
         # Board metrics
         heights = self.env.get_heights()
@@ -1596,7 +1609,7 @@ class VisualTetrisDQNTrainer:
     def render_performance_tab(self):
         """Render content for the Performance tab"""
         perf_x = 420
-        perf_y = 260
+        perf_y = 290  # FIXED: Moved down to avoid overlapping with Frame Skip slider
         panel_width = 360
         panel_height = 200
         
@@ -1750,6 +1763,9 @@ class VisualTetrisDQNTrainer:
                 # Start a new episode
                 self.reset_game()
                 self.episode += 1
+                
+                # FIXED: Make sure we can see the new game state
+                self.render()
                 
                 # Update target network periodically
                 if self.episode % self.target_update_freq == 0:
@@ -1923,8 +1939,9 @@ class VisualTetrisDQNTrainer:
             # Update particle effects
             self.env.update_particles(dt)
             
-            # Process training steps
-            self.train_step()
+            # Process training steps - FIXED: Only train when appropriate
+            if self.training_active or self.do_step:
+                self.train_step()
             
             # Calculate episodes per second
             if self.episode > last_episode:
