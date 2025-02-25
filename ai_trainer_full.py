@@ -1062,8 +1062,9 @@ class VisualTetrisDQNTrainer:
                                        self.toggle_autosave))
         
         # Frame skip slider (for speed) - FIXED: Moved to a new line
-        self.ui_elements.append(Slider(420, 260, 250, 10, 0, 10, 0, 
-                                      "Frame Skip", self.set_frame_skip))
+        self.ui_elements.append(Slider(420, 300, 250, 10, 0, 10, 0, 
+                               "Frame Skip", self.set_frame_skip))
+
     
     def set_training_speed(self, value):
         """Set the training speed multiplier"""
