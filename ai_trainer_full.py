@@ -929,7 +929,7 @@ class VisualTetrisDQNTrainer:
         
         # Screen dimensions
         self.window_width = 1280
-        self.window_height = 900  # FIXED: Increased height to show all game stats
+        self.window_height = 950  # FIXED: Increased height to show all game stats
         self.tetris_width = 300
         self.tetris_height = 600
         self.block_size = 30
