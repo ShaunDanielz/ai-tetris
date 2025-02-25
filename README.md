@@ -24,7 +24,7 @@ To ensure a consistent and isolated environment, this project uses Conda to mana
 ### Step 1: Clone the Repository
 Clone this repository to your local machine:
 ```bash
-git clone https://github.com/your-username/ai-tetris.git
+git clone https://github.com/ShaunDanielz/ai-tetris.git
 cd ai-tetris
 ```
 
@@ -132,5 +132,5 @@ Skipping registering GPU devices...
 ---
 
 ## License
-This project is open-source under the [MIT License](LICENSE).
+This project is open-source under the [MIT License](LICENSE.MD).
 
