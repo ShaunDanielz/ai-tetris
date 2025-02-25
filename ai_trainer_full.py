@@ -15,6 +15,16 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg
 from collections import deque
 from datetime import datetime
 
+# Check if tensorflowjs is available
+try:
+    import tensorflowjs as tfjs
+    TFJS_AVAILABLE = True
+    print("TensorFlow.js converter available - Web export enabled")
+except ImportError:
+    TFJS_AVAILABLE = False
+    print("TensorFlow.js converter not available. To enable web export, install with: pip install tensorflowjs")
+
+
 # Configure GPU usage
 def setup_gpu():
     """Configure GPU usage and return information about available devices"""
@@ -553,6 +563,14 @@ class DQNAgent:
         # Track performance
         self.inference_times = []  # Track time taken for predictions
         self.train_times = []      # Track time taken for training
+
+    def save_full_model(self, name):
+        """Save the full model (architecture + weights)"""
+        model_dir = os.path.dirname(name)
+        if model_dir and not os.path.exists(model_dir):
+            os.makedirs(model_dir)
+        self.model.save(name)
+        print(f"Full model saved to {name}")    
     
     def _build_model(self):
         """Build a deep neural network model"""
@@ -945,6 +963,7 @@ class VisualTetrisDQNTrainer:
         self.tab_manager.add_tab("Network")
         self.tab_manager.add_tab("Board Analysis")
         self.tab_manager.add_tab("Performance")
+        self.tab_manager.add_tab("Web Export")
         
         # Colors
         self.BLACK = (0, 0, 0)
@@ -1009,10 +1028,46 @@ class VisualTetrisDQNTrainer:
         self.last_fps_update = time.time()
         self.frame_count = 0
         self.fps = 0
+
+        # Web export settings
+        self.auto_export_web = True  # Auto export to web when saving
+        self.web_export_status = "No exports yet"
+        self.last_web_export_time = None
         
         # Try to load latest model at startup
         self.load_latest_model()
-    
+
+    def toggle_auto_web_export(self, value):
+        """Toggle automatic export to web"""
+        self.auto_export_web = value
+
+    def export_for_web(self):
+        """Export the current model for web use"""
+        if not TFJS_AVAILABLE:
+            self.web_export_status = "Error: tensorflowjs not installed"
+            print("TensorFlow.js conversion tools not installed. Use 'pip install tensorflowjs' to install.")
+            return
+        
+        # Create output directory
+        output_dir = "models/tetris_dqn/"
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Save full model (not just weights)
+        model_path = f"{output_dir}tetris_dqn_full_{self.episode}.h5"
+        self.agent.save_full_model(model_path)
+        
+        # Convert to TensorFlow.js format
+        web_output_dir = f"{output_dir}web_model_{self.episode}/"
+        
+        success = convert_model_to_tfjs(model_path, web_output_dir)
+        
+        if success:
+            self.web_export_status = f"Successfully exported model for web at episode {self.episode}"
+            self.last_web_export_time = time.time()
+            print(f"Model exported for web use at {web_output_dir}")
+        else:
+            self.web_export_status = "Export failed. See console for details."    
+        
     def _setup_ui(self):
         """Set up all UI elements"""
         # Training controls
@@ -1064,6 +1119,15 @@ class VisualTetrisDQNTrainer:
         # Frame skip slider (for speed) - FIXED: Moved to a new line
         self.ui_elements.append(Slider(420, 300, 250, 10, 0, 10, 0, 
                                "Frame Skip", self.set_frame_skip))
+        
+        # Auto-export to web checkbox
+        self.ui_elements.append(CheckBox(800, 230, 20, "Auto-Export for Web", True, 
+                                        self.toggle_auto_web_export))
+
+        # Web export button
+        self.ui_elements.append(Button("Export for Web", 900, 230, 120, 30, 
+                                    (0, 100, 180), (0, 140, 220), 
+                                    self.export_for_web))
 
     
     def set_training_speed(self, value):
@@ -1170,6 +1234,23 @@ class VisualTetrisDQNTrainer:
             os.rename(temp_state_path, final_state_path)
             
             print(f"Model auto-saved at episode {self.episode}")
+
+            # Add after successful model save
+            if self.auto_export_web and TFJS_AVAILABLE:
+                # Save full model (not just weights) for conversion
+                full_model_path = f"{output_dir}tetris_dqn_latest_full.h5"
+                self.agent.save_full_model(full_model_path)
+                
+                # Convert to TensorFlow.js format
+                web_output_dir = f"{output_dir}web_model_latest/"
+                success = convert_model_to_tfjs(full_model_path, web_output_dir)
+                
+                if success:
+                    self.web_export_status = f"Auto-exported for web at episode {self.episode}"
+                    self.last_web_export_time = time.time()
+                    print(f"Model auto-exported for web use at {web_output_dir}")
+                else:
+                    self.web_export_status = "Auto-export failed. See console for details."
             
         except Exception as e:
             print(f"Error during auto-save: {e}")
@@ -1219,6 +1300,8 @@ class VisualTetrisDQNTrainer:
             milestone_path = f"{output_dir}tetris_dqn_ep{self.episode}.h5"
             self.agent.save(milestone_path)
             print(f"Milestone saved at episode {self.episode}")
+
+            
     
     def render_tetris(self):
         """Draw the Tetris game board"""
@@ -1715,6 +1798,51 @@ class VisualTetrisDQNTrainer:
             self.render_board_analysis_tab()
         elif active_tab == 4:  # Performance tab
             self.render_performance_tab()
+        elif active_tab == 5:  # Web Export tab
+            self.render_web_export_tab()
+
+    def render_web_export_tab(self):
+        """Render content for the Web Export tab"""
+        export_x = 420
+        export_y = 290
+        panel_width = 740
+        panel_height = 300
+        
+        # Background
+        pygame.draw.rect(self.screen, (40, 40, 40), 
+                        (export_x, export_y, panel_width, panel_height))
+        
+        # Title
+        title = self.big_font.render("Web Export Settings", True, self.WHITE)
+        self.screen.blit(title, (export_x + 10, export_y + 10))
+        
+        # Check if tensorflowjs is available
+        if not TFJS_AVAILABLE:
+            error_text = self.font.render(
+                "TensorFlow.js converter not installed. Install with: pip install tensorflowjs", 
+                True, (255, 100, 100))
+            self.screen.blit(error_text, (export_x + 15, export_y + 50))
+            return
+        
+        # Web export information
+        info_text = [
+            "Export your model to use in the HTML implementation:",
+            "",
+            "1. Train your model to achieve good performance",
+            "2. Save the model using 'Save Model' or auto-save feature",
+            "3. Export for web using 'Export for Web' button",
+            "4. The model will be converted to TensorFlow.js format",
+            "5. Use the exported model in the HTML implementation by uploading the model.json file",
+            "",
+            "The HTML implementation can be found in the 'models/tetris_dqn/web_model_latest/' directory",
+            "after exporting.",
+            "",
+            f"Last export: {datetime.fromtimestamp(self.last_web_export_time).strftime('%Y-%m-%d %H:%M:%S') if self.last_web_export_time else 'Never'}"
+        ]
+    
+        for i, text in enumerate(info_text):
+            text_surf = self.font.render(text, True, self.WHITE)
+            self.screen.blit(text_surf, (export_x + 15, export_y + 50 + i * 20))
     
     def render(self):
         """Render the entire visualization"""
@@ -2045,6 +2173,36 @@ class PlotData:
                 for point in points[::max(1, len(points)//20)]:  # Show a subset of points
                     pygame.draw.circle(surface, self.color, (int(point[0]), int(point[1])), 3)
 
+
+# Function to convert model to TensorFlow.js format
+def convert_model_to_tfjs(h5_path, output_folder):
+    """
+    Convert a saved Keras/TensorFlow model to TensorFlow.js format.
+    
+    Args:
+        h5_path: Path to the saved .h5 model file
+        output_folder: Folder where the converted model will be saved
+    
+    Returns:
+        bool: True if conversion was successful, False otherwise
+    """
+    if not TFJS_AVAILABLE:
+        print("Cannot convert model: TensorFlow.js package not installed")
+        print("Install with: pip install tensorflowjs")
+        return False
+    
+    # Create output directory if it doesn't exist
+    os.makedirs(output_folder, exist_ok=True)
+    
+    try:
+        # Convert the model
+        tfjs.converters.save_keras_model(tf.keras.models.load_model(h5_path), output_folder)
+        print(f"Model successfully converted to TensorFlow.js format")
+        print(f"Saved to: {output_folder}")
+        return True
+    except Exception as e:
+        print(f"Error converting model: {e}")
+        return False
 
 if __name__ == "__main__":
     # Create and run the visualizer
