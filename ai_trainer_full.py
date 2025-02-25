@@ -1,3 +1,5 @@
+# ai_trainer_full.p
+
 import numpy as np
 import tensorflow as tf
 import random
