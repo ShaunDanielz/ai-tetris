@@ -132,5 +132,5 @@ Skipping registering GPU devices...
 ---
 
 ## License
-This project is open-source under the [MIT License](LICENSE.MD).
+This project is open-source under the [MIT License](https://github.com/ShaunDanielz/ai-tetris/blob/main/LICENSE.md).
 
