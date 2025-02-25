@@ -3,671 +3,1128 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tetris with AI</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+    <title>Tetris DQN AI Player</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tensorflow/4.14.0/tf.min.js"></script>
     <style>
-        #container {
-            display: flex;
+        body {
             font-family: Arial, sans-serif;
+            background-color: #2a2a2a;
+            color: #fff;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
-        #game-area {
-            margin-right: 20px;
+        h1 {
+            color: #ffffff;
+            margin-bottom: 10px;
         }
-        #game, #next1, #next2, #next3 {
-            border: 1px solid #333;
-            background-color: #fff;
-            display: block;
-            margin: 5px auto;
+        .container {
+            display: flex;
+            gap: 20px;
+            margin-top: 20px;
         }
-        #side-panel {
-            width: 200px;
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
-        h2 {
+        .tetris-board {
+            border: 2px solid #555;
+            background-color: #000;
+            position: relative;
+        }
+        .stats-container {
+            background-color: #333;
+            border-radius: 5px;
+            padding: 15px;
+            width: 300px;
+            margin-top: 20px;
+        }
+        .stats-title {
             font-size: 18px;
-            margin: 10px 0;
+            font-weight: bold;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #555;
+            padding-bottom: 5px;
         }
-        p {
+        .stats-row {
+            display: flex;
+            justify-content: space-between;
             margin: 5px 0;
         }
-        .blink {
-            animation: blink 0.5s infinite;
+        .control-panel {
+            display: flex;
+            flex-direction: column;
+            background-color: #333;
+            border-radius: 5px;
+            padding: 15px;
+            width: 300px;
         }
-        @keyframes blink {
-            50% { opacity: 0; }
+        button {
+            background-color: #4a6da7;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            margin: 5px 0;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.2s;
         }
-        #ai-controls {
+        button:hover {
+            background-color: #5a7db7;
+        }
+        button:disabled {
+            background-color: #555;
+            cursor: not-allowed;
+        }
+        .file-input {
+            margin: 10px 0;
+        }
+        .status {
             margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 14px;
+            background-color: #444;
         }
-        #speed-slider {
+        .model-status {
+            color: #ffaa00;
+        }
+        .speed-control {
+            margin: 10px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        input[type="range"] {
             width: 100%;
+        }
+        .ghost-piece {
+            opacity: 0.3;
+            position: absolute;
+        }
+        .metrics-container {
+            display: flex;
+            flex-direction: column;
+            background-color: #333;
+            border-radius: 5px;
+            padding: 15px;
+            width: 300px;
+            margin-top: 20px;
+        }
+        .q-values {
+            margin-top: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .q-value-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+            padding: 5px;
+            border-radius: 3px;
+        }
+        .best-action {
+            background-color: rgba(0, 200, 0, 0.2);
+        }
+        .progress-container {
+            width: 100%;
+            background-color: #444;
+            height: 20px;
+            border-radius: 5px;
+            margin: 10px 0;
+            overflow: hidden;
+        }
+        .progress-bar {
+            height: 100%;
+            background-color: #4a6da7;
+            width: 0%;
+            transition: width 0.5s;
         }
     </style>
 </head>
 <body>
-    <div id="container">
-        <div id="game-area">
-            <canvas id="game" width="300" height="600"></canvas>
-            <canvas id="next1" width="120" height="120"></canvas>
-            <canvas id="next2" width="120" height="120"></canvas>
-            <canvas id="next3" width="120" height="120"></canvas>
+    <h1>Tetris DQN AI Player</h1>
+    <p>Watch an AI play Tetris using a pre-trained Deep Q-Network model</p>
+    
+    <div class="container">
+        <div class="game-container">
+            <canvas id="tetris-canvas" class="tetris-board" width="300" height="600"></canvas>
+            
+            <div class="stats-container">
+                <div class="stats-title">Game Stats</div>
+                <div class="stats-row">
+                    <span>Score:</span>
+                    <span id="score">0</span>
+                </div>
+                <div class="stats-row">
+                    <span>Lines:</span>
+                    <span id="lines">0</span>
+                </div>
+                <div class="stats-row">
+                    <span>Games:</span>
+                    <span id="games">0</span>
+                </div>
+                <div class="stats-row">
+                    <span>Max Score:</span>
+                    <span id="max-score">0</span>
+                </div>
+                <div class="stats-row">
+                    <span>Avg Score:</span>
+                    <span id="avg-score">0</span>
+                </div>
+            </div>
         </div>
-        <div id="side-panel">
-            <h2>Controls</h2>
-            <p>Left Arrow: Move Left</p>
-            <p>Right Arrow: Move Right</p>
-            <p>Down Arrow: Move Down</p>
-            <p>Up Arrow: Rotate</p>
-            <p>Space: Hard Drop</p>
-            <h2>Tips</h2>
-            <p>Fill rows completely to clear them.</p>
-            <p>Plan ahead with the next tetromino.</p>
-            <p>Stack efficiently to avoid gaps.</p>
-            <h2>Stats</h2>
-            <p>Level: <span id="level">1</span></p>
-            <p>Lines to Next: <span id="lines-to-next">10</span></p>
-            <p>Score: <span id="score">0</span></p>
-            <p>Total Score: <span id="total-score">0</span></p>
-            <p>High Score: <span id="high-score">0</span></p>
-            <p>Episode: <span id="episode">0</span></p>
-            <p>Episode Reward: <span id="episode-reward">0</span></p>
-            <p id="game-over" style="color: red; display: none;">Game Over! <span class="blink">Press Enter to Restart</span></p>
-            <div id="ai-controls">
-                <h2>AI Controls</h2>
-                <button id="ai-toggle">Toggle AI (Off)</button>
-                <p>AI Speed: <input type="range" id="speed-slider" min="50" max="2000" value="500"></p>
-                <button id="save-model">Save Model</button>
-                <button id="load-model">Load Model</button>
+        
+        <div class="control-panel">
+            <h3>Controls</h3>
+            
+            <div class="file-input">
+                <label for="model-upload">Upload Model JSON:</label>
+                <input type="file" id="model-upload" accept=".json">
+            </div>
+            
+            <div class="file-input">
+                <label for="weights-upload">Upload Weights:</label>
+                <input type="file" id="weights-upload" accept=".bin">
+            </div>
+            
+            <button id="start-button" disabled>Start AI</button>
+            <button id="pause-button" disabled>Pause</button>
+            <button id="reset-button">Reset Game</button>
+            
+            <div class="speed-control">
+                <label for="speed-slider">Game Speed:</label>
+                <input type="range" id="speed-slider" min="1" max="20" value="5">
+                <span id="speed-value">5x</span>
+            </div>
+            
+            <div class="status">
+                <div class="model-status" id="model-status">Model not loaded</div>
+                <div id="game-status">Game ready</div>
+            </div>
+            
+            <div class="progress-container">
+                <div class="progress-bar" id="progress-bar"></div>
+            </div>
+        </div>
+        
+        <div class="metrics-container">
+            <h3>AI Metrics</h3>
+            <div class="stats-row">
+                <span>Last Action:</span>
+                <span id="last-action">None</span>
+            </div>
+            <div class="stats-row">
+                <span>Holes:</span>
+                <span id="holes">0</span>
+            </div>
+            <div class="stats-row">
+                <span>Bumpiness:</span>
+                <span id="bumpiness">0</span>
+            </div>
+            <div class="stats-row">
+                <span>Avg Height:</span>
+                <span id="avg-height">0</span>
+            </div>
+            
+            <h4>Top Q-Values</h4>
+            <div class="q-values" id="q-values">
+                <!-- Q-values will be added here -->
             </div>
         </div>
     </div>
 
     <script>
-        // Tetromino definitions with shapes for each orientation
-        const TETROMINOES = {
-            'I': { shapes: [[[0,0,0,0], [1,1,1,1], [0,0,0,0], [0,0,0,0]], [[0,0,1,0], [0,0,1,0], [0,0,1,0], [0,0,1,0]], [[0,0,0,0], [0,0,0,0], [1,1,1,1], [0,0,0,0]], [[0,1,0,0], [0,1,0,0], [0,1,0,0], [0,1,0,0]]] },
-            'O': { shapes: [[[0,0,0,0], [0,1,1,0], [0,1,1,0], [0,0,0,0]]] },
-            'T': { shapes: [[[0,1,0,0], [1,1,1,0], [0,0,0,0], [0,0,0,0]], [[0,1,0,0], [0,1,1,0], [0,1,0,0], [0,0,0,0]], [[0,0,0,0], [1,1,1,0], [0,1,0,0], [0,0,0,0]], [[0,1,0,0], [1,1,0,0], [0,1,0,0], [0,0,0,0]]] },
-            'S': { shapes: [[[0,1,1,0], [1,1,0,0], [0,0,0,0], [0,0,0,0]], [[0,1,0,0], [0,1,1,0], [0,0,1,0], [0,0,0,0]], [[0,0,0,0], [0,1,1,0], [1,1,0,0], [0,0,0,0]], [[1,0,0,0], [1,1,0,0], [0,1,0,0], [0,0,0,0]]] },
-            'Z': { shapes: [[[1,1,0,0], [0,1,1,0], [0,0,0,0], [0,0,0,0]], [[0,0,1,0], [0,1,1,0], [0,1,0,0], [0,0,0,0]], [[0,0,0,0], [1,1,0,0], [0,1,1,0], [0,0,0,0]], [[0,1,0,0], [1,1,0,0], [1,0,0,0], [0,0,0,0]]] },
-            'J': { shapes: [[[1,0,0,0], [1,1,1,0], [0,0,0,0], [0,0,0,0]], [[0,1,1,0], [0,1,0,0], [0,1,0,0], [0,0,0,0]], [[0,0,0,0], [1,1,1,0], [0,0,1,0], [0,0,0,0]], [[0,1,0,0], [0,1,0,0], [1,1,0,0], [0,0,0,0]]] },
-            'L': { shapes: [[[0,0,1,0], [1,1,1,0], [0,0,0,0], [0,0,0,0]], [[0,1,0,0], [0,1,0,0], [0,1,1,0], [0,0,0,0]], [[0,0,0,0], [1,1,1,0], [1,0,0,0], [0,0,0,0]], [[1,1,0,0], [0,1,0,0], [0,1,0,0], [0,0,0,0]]] }
-        };
-
-        const COLORS = ['#4477AA', '#EE7733', '#228833', '#CCBB44', '#AA3377', '#BBBBBB', '#66CCEE', '#EE6677'];
-
-        // Game state variables
-        const GRID_WIDTH = 10;
-        const GRID_HEIGHT = 20;
-        const CELL_SIZE = 30;
-        let grid = Array(GRID_HEIGHT).fill().map(() => Array(GRID_WIDTH).fill(''));
-        let currentTetromino = null;
-        let upcomingTetrominoes = [];  // Array to hold the next three tetrominoes
-        let score = 0;
-        let totalScore = 0;  // Cumulative score across episodes
-        let level = 1;
-        let linesCleared = 0;
-        let linesPerLevel = 10;
-        let fallInterval = 1000;
-        let lastFallTime = 0;
-        let gameOver = false;
-        let highScore = localStorage.getItem('tetrisHighScore') || 0;
-        let episode = 0;
-        let aiMode = false;
-        let aiInterval;
-        let episodeReward = 0;  // Track cumulative reward per episode
-
-        // Canvas setup
-        const gameCanvas = document.getElementById('game');
-        const next1Canvas = document.getElementById('next1');
-        const next2Canvas = document.getElementById('next2');
-        const next3Canvas = document.getElementById('next3');
-        const gameCtx = gameCanvas.getContext('2d');
-        const next1Ctx = next1Canvas.getContext('2d');
-        const next2Ctx = next2Canvas.getContext('2d');
-        const next3Ctx = next3Canvas.getContext('2d');
-
-        // DOM elements
-        const levelDisplay = document.getElementById('level');
-        const linesToNextDisplay = document.getElementById('lines-to-next');
-        const scoreDisplay = document.getElementById('score');
-        const totalScoreDisplay = document.getElementById('total-score');  // New display for total score
-        const highScoreDisplay = document.getElementById('high-score');
-        const episodeDisplay = document.getElementById('episode');
-        const episodeRewardDisplay = document.getElementById('episode-reward');
-        const gameOverDisplay = document.getElementById('game-over');
-        const aiToggleButton = document.getElementById('ai-toggle');
-        const speedSlider = document.getElementById('speed-slider');
-        const saveModelButton = document.getElementById('save-model');
-        const loadModelButton = document.getElementById('load-model');
-        highScoreDisplay.textContent = highScore;
-
-        // Audio setup
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-
-        function playSound(frequency, duration) {
-            const oscillator = audioCtx.createOscillator();
-            oscillator.type = 'square';
-            oscillator.frequency.setValueAtTime(frequency, audioCtx.currentTime);
-            oscillator.connect(audioCtx.destination);
-            oscillator.start();
-            oscillator.stop(audioCtx.currentTime + duration);
-        }
-
-        // Tetromino generation
-        function generateTetromino() {
-            const types = Object.keys(TETROMINOES);
-            const type = types[Math.floor(Math.random() * types.length)];
-            const shapes = TETROMINOES[type].shapes;
-            const availableColors = COLORS.slice(0, 2 + level);
-            const color = availableColors[Math.floor(Math.random() * availableColors.length)];
-            return {
-                type,
-                shapes,
-                orientation: 0,
-                color,
-                x: Math.floor(GRID_WIDTH / 2) - 2,
-                y: 0
-            };
-        }
-
-        // Rendering functions
-        function drawCell(ctx, x, y, color) {
-            ctx.fillStyle = color;
-            ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE - 1, CELL_SIZE - 1);
-            ctx.strokeStyle = '#333';
-            ctx.strokeRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE - 1, CELL_SIZE - 1);
-        }
-
-        function drawGrid() {
-            gameCtx.fillStyle = '#fff';
-            gameCtx.fillRect(0, 0, gameCanvas.width, gameCanvas.height);
-            for (let row = 0; row < GRID_HEIGHT; row++) {
-                for (let col = 0; col < GRID_WIDTH; col++) {
-                    if (grid[row][col]) {
-                        drawCell(gameCtx, col, row, grid[row][col]);
-                    } else {
-                        gameCtx.strokeStyle = '#ccc';
-                        gameCtx.strokeRect(col * CELL_SIZE, row * CELL_SIZE, CELL_SIZE - 1, CELL_SIZE - 1);
-                    }
+        // Tetris Environment Implementation
+        class TetrisEnv {
+            constructor() {
+                this.width = 10;
+                this.height = 20;
+                this.board = null;
+                this.currentPiece = null;
+                this.currentPos = null;
+                this.score = 0;
+                this.linesCleared = 0;
+                this.gameOver = false;
+                this.pieceColors = {};
+                this.activeParticles = [];
+                this.ghostPosition = { x: 0, y: 0 };
+                this.canvas = document.getElementById('tetris-canvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.blockSize = 30; // Size of each block in pixels
+                this.reset();
+            }
+            
+            reset() {
+                this.board = Array(this.height).fill().map(() => Array(this.width).fill(0));
+                this.score = 0;
+                this.linesCleared = 0;
+                this.gameOver = false;
+                this.pieceColors = {};
+                this.activeParticles = [];
+                this._newPiece();
+                return this.getState();
+            }
+            
+            _newPiece() {
+                const tetrominoKeys = Object.keys(TETROMINOS);
+                const randomKey = tetrominoKeys[Math.floor(Math.random() * tetrominoKeys.length)];
+                this.currentPiece = JSON.parse(JSON.stringify(TETROMINOS[randomKey].shape));
+                
+                // Start position
+                this.currentPos = {
+                    x: Math.floor(this.width / 2) - Math.floor(this.currentPiece[0].length / 2),
+                    y: 0
+                };
+                
+                // Assign a random color to this piece
+                const pieceValue = Math.max(...this.currentPiece.flat());
+                if (pieceValue > 0 && !this.pieceColors[pieceValue]) {
+                    this.pieceColors[pieceValue] = COLORBLIND_COLORS[Math.floor(Math.random() * COLORBLIND_COLORS.length)];
+                }
+                
+                // Update ghost piece position
+                this._updateGhostPosition();
+                
+                // Check if game is over (collision on spawn)
+                if (this._checkCollision(0, 0)) {
+                    this.gameOver = true;
                 }
             }
-        }
-
-        function drawTetromino(ctx, tetromino, offsetX, offsetY) {
-            const shape = tetromino.shapes[tetromino.orientation];
-            for (let row = 0; row < 4; row++) {
-                for (let col = 0; col < 4; col++) {
-                    if (shape[row][col]) {
-                        drawCell(ctx, offsetX + col, offsetY + row, tetromino.color);
-                    }
-                }
-            }
-        }
-
-        function drawNextTetromino() {
-            next1Ctx.clearRect(0, 0, next1Canvas.width, next1Canvas.height);
-            drawTetromino(next1Ctx, upcomingTetrominoes[0], 0, 0);
-            next2Ctx.clearRect(0, 0, next2Canvas.width, next2Canvas.height);
-            drawTetromino(next2Ctx, upcomingTetrominoes[1], 0, 0);
-            next3Ctx.clearRect(0, 0, next3Canvas.width, next3Canvas.height);
-            drawTetromino(next3Ctx, upcomingTetrominoes[2], 0, 0);
-        }
-
-        function render() {
-            drawGrid();
-            if (currentTetromino) {
-                drawTetromino(gameCtx, currentTetromino, currentTetromino.x, currentTetromino.y);
-            }
-            drawNextTetromino();
-            scoreDisplay.textContent = score;
-            totalScoreDisplay.textContent = totalScore;  // Update total score display
-            levelDisplay.textContent = level;
-            linesToNextDisplay.textContent = linesPerLevel - (linesCleared % linesPerLevel);
-            episodeDisplay.textContent = episode;
-            episodeRewardDisplay.textContent = episodeReward;
-        }
-
-        // Collision detection
-        function checkCollision(x, y, shape) {
-            for (let row = 0; row < 4; row++) {
-                for (let col = 0; col < 4; col++) {
-                    if (shape[row][col]) {
-                        const newX = x + col;
-                        const newY = y + row;
-                        if (newX < 0 || newX >= GRID_WIDTH || newY >= GRID_HEIGHT || (newY >= 0 && grid[newY][newX])) {
+            
+            _checkCollision(dx = 0, dy = 0) {
+                for (let y = 0; y < this.currentPiece.length; y++) {
+                    for (let x = 0; x < this.currentPiece[y].length; x++) {
+                        if (this.currentPiece[y][x] === 0) continue;
+                        
+                        const newX = this.currentPos.x + x + dx;
+                        const newY = this.currentPos.y + y + dy;
+                        
+                        // Check if out of bounds
+                        if (newX < 0 || newX >= this.width || newY >= this.height) {
+                            return true;
+                        }
+                        
+                        // Check if collision with placed pieces
+                        if (newY >= 0 && this.board[newY][newX] !== 0) {
                             return true;
                         }
                     }
                 }
+                return false;
             }
-            return false;
-        }
-
-        // For state-based collision detection
-        function checkCollisionState(board, x, y, shape) {
-            for (let row = 0; row < 4; row++) {
-                for (let col = 0; col < 4; col++) {
-                    if (shape[row][col]) {
-                        const newX = x + col;
-                        const newY = y + row;
-                        if (newX < 0 || newX >= GRID_WIDTH || newY >= GRID_HEIGHT || (newY >= 0 && board[newY][newX])) {
-                            return true;
+            
+            _updateGhostPosition() {
+                this.ghostPosition = { x: this.currentPos.x, y: this.currentPos.y };
+                
+                // Drop as far as possible
+                while (!this._checkCollision(0, this.ghostPosition.y - this.currentPos.y + 1)) {
+                    this.ghostPosition.y += 1;
+                }
+            }
+            
+            _rotatePiece(clockwise = true) {
+                // Make a copy of the current piece
+                const originalPiece = JSON.parse(JSON.stringify(this.currentPiece));
+                
+                // Transpose
+                const rows = this.currentPiece.length;
+                const cols = this.currentPiece[0].length;
+                const rotated = Array(cols).fill().map(() => Array(rows).fill(0));
+                
+                for (let y = 0; y < rows; y++) {
+                    for (let x = 0; x < cols; x++) {
+                        if (clockwise) {
+                            rotated[x][rows - 1 - y] = this.currentPiece[y][x];
+                        } else {
+                            rotated[cols - 1 - x][y] = this.currentPiece[y][x];
+                        }
+                    }
+                }
+                
+                this.currentPiece = rotated;
+                
+                // Check if rotation causes collision
+                if (this._checkCollision()) {
+                    // Revert rotation
+                    this.currentPiece = originalPiece;
+                    return false;
+                }
+                
+                // Update ghost position after rotation
+                this._updateGhostPosition();
+                return true;
+            }
+            
+            _mergePiece() {
+                for (let y = 0; y < this.currentPiece.length; y++) {
+                    for (let x = 0; x < this.currentPiece[y].length; x++) {
+                        if (this.currentPiece[y][x] !== 0) {
+                            this.board[this.currentPos.y + y][this.currentPos.x + x] = this.currentPiece[y][x];
                         }
                     }
                 }
             }
-            return false;
-        }
-
-        // Tetromino movement
-        function moveDown() {
-            if (!checkCollision(currentTetromino.x, currentTetromino.y + 1, currentTetromino.shapes[currentTetromino.orientation])) {
-                currentTetromino.y++;
-            } else {
-                lockTetromino();
-                generateNewTetromino();
-            }
-        }
-
-        function moveLeft() {
-            if (!checkCollision(currentTetromino.x - 1, currentTetromino.y, currentTetromino.shapes[currentTetromino.orientation])) {
-                currentTetromino.x--;
-            }
-        }
-
-        function moveRight() {
-            if (!checkCollision(currentTetromino.x + 1, currentTetromino.y, currentTetromino.shapes[currentTetromino.orientation])) {
-                currentTetromino.x++;
-            }
-        }
-
-        function rotate() {
-            const newOrientation = (currentTetromino.orientation + 1) % currentTetromino.shapes.length;
-            if (!checkCollision(currentTetromino.x, currentTetromino.y, currentTetromino.shapes[newOrientation])) {
-                currentTetromino.orientation = newOrientation;
-                playSound(800, 0.1);
-            }
-        }
-
-        function hardDrop() {
-            while (!checkCollision(currentTetromino.x, currentTetromino.y + 1, currentTetromino.shapes[currentTetromino.orientation])) {
-                currentTetromino.y++;
-            }
-            lockTetromino();
-            generateNewTetromino();
-            playSound(600, 0.2);
-        }
-
-        function lockTetromino() {
-            const shape = currentTetromino.shapes[currentTetromino.orientation];
-            for (let row = 0; row < 4; row++) {
-                for (let col = 0; col < 4; col++) {
-                    if (shape[row][col]) {
-                        const gridX = currentTetromino.x + col;
-                        const gridY = currentTetromino.y + row;
-                        if (gridY >= 0) {
-                            grid[gridY][gridX] = currentTetromino.color;
+            
+            _clearLines() {
+                let linesCleared = 0;
+                const linesToClear = [];
+                
+                // Find lines to clear
+                for (let y = 0; y < this.height; y++) {
+                    if (this.board[y].every(cell => cell !== 0)) {
+                        linesToClear.push(y);
+                        linesCleared += 1;
+                    }
+                }
+                
+                // Create particles for cleared lines
+                for (let y of linesToClear) {
+                    for (let x = 0; x < this.width; x++) {
+                        // Create particles
+                        for (let i = 0; i < 2; i++) {
+                            this._addParticle(x, y, this.board[y][x]);
                         }
                     }
                 }
-            }
-            const lines = clearLines();
-            const pointsEarned = [0, 100, 300, 500, 800][lines];
-            score += pointsEarned;
-            totalScore += pointsEarned;  // Update total score
-            linesCleared += lines;
-            playSound(500, 0.3);
-            if (linesCleared >= linesPerLevel * level) {
-                levelUp();
-            }
-            return lines;
-        }
-
-        function clearLines() {
-            let lines = 0;
-            for (let row = GRID_HEIGHT - 1; row >= 0; row--) {
-                if (grid[row].every(cell => cell)) {
-                    grid.splice(row, 1);
-                    grid.unshift(Array(GRID_WIDTH).fill(''));
-                    lines++;
-                    row++;
+                
+                // Remove the lines
+                for (let y of linesToClear) {
+                    // Remove the line
+                    this.board.splice(y, 1);
+                    // Add a new empty line at the top
+                    this.board.unshift(Array(this.width).fill(0));
                 }
+                
+                return linesCleared;
             }
-            return lines;
-        }
-
-        function levelUp() {
-            level++;
-            fallInterval = Math.max(100, 1000 - 100 * (level - 1));
-            playSound(1000, 0.5);
-        }
-
-        function generateNewTetromino() {
-            currentTetromino = upcomingTetrominoes.shift(); // Take the first tetromino from the queue
-            upcomingTetrominoes.push(generateTetromino());  // Add a new one to the end
-            if (checkCollision(currentTetromino.x, currentTetromino.y, currentTetromino.shapes[currentTetromino.orientation])) {
-                endGame();
-            }
-        }
-
-        function endGame() {
-            gameOver = true;
-            gameOverDisplay.style.display = 'block';
-            playSound(400, 0.2);
-            setTimeout(() => playSound(300, 0.2), 200);
-            setTimeout(() => playSound(200, 0.2), 400);
-            if (score > highScore) {
-                highScore = score;
-                localStorage.setItem('tetrisHighScore', highScore);
-                highScoreDisplay.textContent = highScore;
-            }
-            episode++;
-            // Reset episode cumulative reward at the end of each episode.
-            episodeReward = 0;
-        }
-
-        function resetGame() {
-            grid = Array(GRID_HEIGHT).fill().map(() => Array(GRID_WIDTH).fill(''));
-            score = 0;
-            level = 1;
-            linesCleared = 0;
-            fallInterval = 1000;
-            gameOver = false;
-            gameOverDisplay.style.display = 'none';
-            upcomingTetrominoes = [generateTetromino(), generateTetromino(), generateTetromino()];
-            currentTetromino = generateTetromino();
-            if (aiMode) {
-                clearInterval(aiInterval);
-                aiInterval = setInterval(aiStep, 2050 - parseInt(speedSlider.value));  // Inverted interval
-            } else {
-                lastFallTime = performance.now();
-                requestAnimationFrame(gameLoop);
-            }
-        }
-
-        // Game loop for manual play
-        function gameLoop(timestamp) {
-            if (gameOver) return;
-            if (aiMode) {
-                clearInterval(aiInterval);
-                aiInterval = setInterval(aiStep, 2050 - parseInt(speedSlider.value));  // Inverted interval
-                return;
-            }
-            if (timestamp - lastFallTime >= fallInterval) {
-                moveDown();
-                lastFallTime = timestamp;
-            }
-            render();
-            requestAnimationFrame(gameLoop);
-        }
-
-        // --- AI Setup ---
-        const STATE_SIZE = GRID_HEIGHT * GRID_WIDTH + 7 + 3 + 7 * 3; // 200 + 7 + 3 + 21 = 231
-        const NUM_ACTIONS = 40;     // 4 rotations * 10 x positions
-        const model = tf.sequential();
-        model.add(tf.layers.dense({units: 256, activation: 'relu', inputShape: [STATE_SIZE]}));
-        model.add(tf.layers.dense({units: 256, activation: 'relu'}));
-        model.add(tf.layers.dense({units: NUM_ACTIONS}));
-        model.compile({optimizer: 'adam', loss: 'meanSquaredError'});
-
-        const targetModel = tf.sequential();
-        targetModel.add(tf.layers.dense({units: 256, activation: 'relu', inputShape: [STATE_SIZE]}));
-        targetModel.add(tf.layers.dense({units: 256, activation: 'relu'}));
-        targetModel.add(tf.layers.dense({units: NUM_ACTIONS}));
-        targetModel.setWeights(model.getWeights());
-
-        const replayBuffer = [];
-        const MAX_BUFFER_SIZE = 10000;
-        const BATCH_SIZE = 32;
-        let epsilon = 1.0;
-        const EPSILON_MIN = 0.01;
-        const EPSILON_DECAY = 0.995;
-        const GAMMA = 0.99;
-        let stepCount = 0;
-
-        // Enhanced state representation: including tetromino x, y, orientation, and next three tetrominoes
-        function getStateVector() {
-            const boardFlat = grid.flat().map(cell => cell ? 1 : 0);
-            const tetrominoOneHot = Array(7).fill(0);
-            const types = Object.keys(TETROMINOES);
-            tetrominoOneHot[types.indexOf(currentTetromino.type)] = 1;
-            const posAndOrient = [
-                currentTetromino.x / GRID_WIDTH,
-                currentTetromino.y / GRID_HEIGHT,
-                currentTetromino.shapes.length > 0 ? currentTetromino.orientation / currentTetromino.shapes.length : 0
-            ];
-            const upcomingOneHots = upcomingTetrominoes.map(t => {
-                const oneHot = Array(7).fill(0);
-                oneHot[types.indexOf(t.type)] = 1;
-                return oneHot;
-            }).flat();
-            return boardFlat.concat(tetrominoOneHot, posAndOrient, upcomingOneHots);
-        }
-
-        function getStateVectorFromExperience(state) {
-            const boardFlat = state.board.flat().map(cell => cell ? 1 : 0);
-            const tetrominoOneHot = Array(7).fill(0);
-            const types = Object.keys(TETROMINOES);
-            tetrominoOneHot[types.indexOf(state.tetromino.type)] = 1;
-            const posAndOrient = [
-                state.tetromino.x / GRID_WIDTH,
-                state.tetromino.y / GRID_HEIGHT,
-                state.tetromino.shapes.length > 0 ? state.tetromino.orientation / state.tetromino.shapes.length : 0
-            ];
-            const upcomingOneHots = state.upcomingTypes.map(type => {
-                const oneHot = Array(7).fill(0);
-                oneHot[types.indexOf(type)] = 1;
-                return oneHot;
-            }).flat();
-            return boardFlat.concat(tetrominoOneHot, posAndOrient, upcomingOneHots);
-        }
-
-        // Count holes on a given board (hole: an empty cell with a filled cell above)
-        function countHolesForBoard(board) {
-            let holes = 0;
-            for (let col = 0; col < GRID_WIDTH; col++) {
-                let blockFound = false;
-                for (let row = 0; row < GRID_HEIGHT; row++) {
-                    if (board[row][col]) {
-                        blockFound = true;
-                    } else if (blockFound && !board[row][col]) {
-                        holes++;
-                    }
-                }
-            }
-            return holes;
-        }
-
-        // Compute valid actions based on the current live state
-        function getValidActions() {
-            const validActions = [];
-            for (let rotation = 0; rotation < currentTetromino.shapes.length; rotation++) {
-                for (let x = 0; x < GRID_WIDTH; x++) {
-                    let y = 0;
-                    while (!checkCollision(currentTetromino.x = x, y + 1, currentTetromino.shapes[rotation])) {
-                        y++;
-                    }
-                    if (!checkCollision(x, y, currentTetromino.shapes[rotation])) {
-                        const actionIndex = rotation * 10 + x;
-                        validActions.push({index: actionIndex, rotation, x, y});
-                    }
-                }
-            }
-            return validActions;
-        }
-
-        // Compute valid actions from a provided state (using state.board and state.tetromino)
-        function getValidActionsFromState(state) {
-            const validActions = [];
-            for (let rotation = 0; rotation < state.tetromino.shapes.length; rotation++) {
-                for (let x = 0; x < GRID_WIDTH; x++) {
-                    let y = 0;
-                    while (!checkCollisionState(state.board, x, y + 1, state.tetromino.shapes[rotation])) {
-                        y++;
-                    }
-                    if (!checkCollisionState(state.board, x, y, state.tetromino.shapes[rotation])) {
-                        const actionIndex = rotation * 10 + x;
-                        validActions.push({index: actionIndex, rotation, x, y});
-                    }
-                }
-            }
-            return validActions;
-        }
-
-        function selectAction() {
-            const validActions = getValidActions();
-            if (Math.random() < epsilon) {
-                return validActions[Math.floor(Math.random() * validActions.length)];
-            }
-            const stateVector = getStateVector();
-            const stateTensor = tf.tensor2d([stateVector], [1, STATE_SIZE]);
-            const qValues = model.predict(stateTensor).dataSync();
-            let maxQ = -Infinity;
-            let bestAction = validActions[0];
-            validActions.forEach(action => {
-                if (qValues[action.index] > maxQ) {
-                    maxQ = qValues[action.index];
-                    bestAction = action;
-                }
-            });
-            tf.dispose(stateTensor);
-            return bestAction;
-        }
-
-        function storeExperience(state, action, reward, nextState, done) {
-            const experience = {state, action: action.index, reward, nextState, done};
-            if (replayBuffer.length >= MAX_BUFFER_SIZE) {
-                replayBuffer.shift();
-            }
-            replayBuffer.push(experience);
-        }
-
-        async function trainModel() {
-            if (replayBuffer.length < BATCH_SIZE) return;
-            const batchIndices = Array.from({length: BATCH_SIZE}, () => Math.floor(Math.random() * replayBuffer.length));
-            const batch = batchIndices.map(i => replayBuffer[i]);
-
-            const states = batch.map(exp => getStateVectorFromExperience(exp.state));
-            const nextStates = batch.map(exp => getStateVectorFromExperience(exp.nextState));
-            const stateTensor = tf.tensor2d(states, [BATCH_SIZE, STATE_SIZE]);
-            const nextStateTensor = tf.tensor2d(nextStates, [BATCH_SIZE, STATE_SIZE]);
-
-            const qValues = model.predict(stateTensor);
-            const qValuesNext = targetModel.predict(nextStateTensor).dataSync();
-            const targets = qValues.dataSync().slice();
-
-            batch.forEach((exp, i) => {
-                const offset = i * NUM_ACTIONS;
-                const validNextActions = getValidActionsFromState(exp.nextState);
-                let maxNextQ = -Infinity;
-                validNextActions.forEach(action => {
-                    if (qValuesNext[offset + action.index] > maxNextQ) {
-                        maxNextQ = qValuesNext[offset + action.index];
-                    }
+            
+            _addParticle(x, y, pieceValue) {
+                const color = this.pieceColors[pieceValue] || COLORBLIND_COLORS[0];
+                
+                // Random velocity for the particle
+                const vx = (Math.random() - 0.5) * 4;
+                const vy = -(Math.random() * 3 + 2); // Up direction
+                
+                // Create particle
+                this.activeParticles.push({
+                    x: x,
+                    y: y,
+                    vx: vx,
+                    vy: vy,
+                    color: color,
+                    lifetime: Math.random() + 0.5, // 0.5 to 1.5 seconds
+                    size: Math.random() * 4 + 2 // 2 to 6 pixels
                 });
-                const target = exp.done ? exp.reward : exp.reward + GAMMA * maxNextQ;
-                targets[offset + exp.action] = target;
-            });
-
-            await model.fit(stateTensor, tf.tensor2d(targets, [BATCH_SIZE, NUM_ACTIONS]), {epochs: 1, verbose: 0});
-            tf.dispose([stateTensor, nextStateTensor, qValues]);
-            if (stepCount % 1000 === 0) {
-                targetModel.setWeights(model.getWeights());
+            }
+            
+            updateParticles(dt) {
+                const gravity = 9.8;
+                
+                for (let i = this.activeParticles.length - 1; i >= 0; i--) {
+                    const particle = this.activeParticles[i];
+                    
+                    // Update position
+                    particle.x += particle.vx * dt;
+                    particle.y += particle.vy * dt;
+                    
+                    // Apply gravity
+                    particle.vy += gravity * dt;
+                    
+                    // Reduce lifetime
+                    particle.lifetime -= dt;
+                    
+                    // Remove expired particles
+                    if (particle.lifetime <= 0) {
+                        this.activeParticles.splice(i, 1);
+                    }
+                }
+            }
+            
+            getHeights() {
+                const heights = [];
+                for (let x = 0; x < this.width; x++) {
+                    let y = 0;
+                    while (y < this.height && this.board[y][x] === 0) {
+                        y++;
+                    }
+                    heights.push(this.height - y);
+                }
+                return heights;
+            }
+            
+            countHoles() {
+                let holes = 0;
+                for (let x = 0; x < this.width; x++) {
+                    let blockFound = false;
+                    for (let y = 0; y < this.height; y++) {
+                        if (this.board[y][x] !== 0) {
+                            blockFound = true;
+                        } else if (blockFound) {
+                            holes++;
+                        }
+                    }
+                }
+                return holes;
+            }
+            
+            getBumpiness() {
+                const heights = this.getHeights();
+                let bumpiness = 0;
+                for (let i = 0; i < heights.length - 1; i++) {
+                    bumpiness += Math.abs(heights[i] - heights[i + 1]);
+                }
+                return bumpiness;
+            }
+            
+            getState() {
+                // Flatten the board to 1s and 0s
+                const flatBoard = this.board.flat().map(cell => cell > 0 ? 1 : 0);
+                
+                // Encode current piece type (one-hot)
+                let pieceType = -1;
+                for (let i = 0; i < Object.keys(TETROMINOS).length; i++) {
+                    const key = Object.keys(TETROMINOS)[i];
+                    // Need a deep comparison for 2D arrays
+                    const shape1 = JSON.stringify(TETROMINOS[key].shape);
+                    const shape2 = JSON.stringify(this.currentPiece);
+                    if (shape1 === shape2) {
+                        pieceType = i;
+                        break;
+                    }
+                }
+                
+                // Binary encoding of piece type + normalized x position
+                const pieceEncoding = [0, 0, 0, 0];
+                if (pieceType >= 0) {
+                    pieceEncoding[0] = (pieceType & 1) ? 1 : 0;
+                    pieceEncoding[1] = (pieceType & 2) ? 1 : 0;
+                    pieceEncoding[2] = (pieceType & 4) ? 1 : 0;
+                    pieceEncoding[3] = this.currentPos.x / this.width; // Normalized x position
+                }
+                
+                return flatBoard.concat(pieceEncoding);
+            }
+            
+            step(action) {
+                if (this.gameOver) {
+                    return {
+                        state: this.getState(),
+                        reward: -100,
+                        done: true,
+                        info: {}
+                    };
+                }
+                
+                // Save the initial state for reward calculation
+                const initialBoard = JSON.parse(JSON.stringify(this.board));
+                const initialHeights = this.getHeights();
+                const initialHoles = this.countHoles();
+                
+                // Decode action
+                const rotation = Math.floor(action / 10) % 4;
+                const position = action % 10;
+                
+                // Perform rotation
+                for (let i = 0; i < rotation; i++) {
+                    this._rotatePiece();
+                }
+                
+                // Move to target x position
+                const currentX = this.currentPos.x;
+                let targetX = position;
+                
+                // Adjust for piece width
+                const pieceWidth = this.currentPiece[0].length;
+                if (targetX + pieceWidth > this.width) {
+                    targetX = this.width - pieceWidth;
+                }
+                
+                // Move horizontally
+                const dx = targetX - currentX;
+                if (dx < 0) {
+                    for (let i = 0; i < Math.abs(dx); i++) {
+                        if (!this._checkCollision(-1, 0)) {
+                            this.currentPos.x -= 1;
+                            this._updateGhostPosition();
+                        } else {
+                            break;
+                        }
+                    }
+                } else if (dx > 0) {
+                    for (let i = 0; i < dx; i++) {
+                        if (!this._checkCollision(1, 0)) {
+                            this.currentPos.x += 1;
+                            this._updateGhostPosition();
+                        } else {
+                            break;
+                        }
+                    }
+                }
+                
+                // Drop the piece all the way down
+                while (!this._checkCollision(0, 1)) {
+                    this.currentPos.y += 1;
+                }
+                
+                // Merge piece and check for cleared lines
+                this._mergePiece();
+                const linesCleared = this._clearLines();
+                
+                // Update score
+                if (linesCleared > 0) {
+                    this.score += (1 << linesCleared) * 100; // 100, 200, 400, 800
+                    this.linesCleared += linesCleared;
+                }
+                
+                // Get new piece
+                this._newPiece();
+                
+                // Calculate reward
+                const reward = this._calculateReward(initialBoard, initialHeights, initialHoles, linesCleared);
+                
+                return {
+                    state: this.getState(),
+                    reward: reward,
+                    done: this.gameOver,
+                    info: { linesCleared: linesCleared }
+                };
+            }
+            
+            _calculateReward(initialBoard, initialHeights, initialHoles, linesCleared) {
+                let reward = 0;
+                
+                // Base reward for surviving
+                reward += 0.1;
+                
+                // Reward for clearing lines
+                if (linesCleared > 0) {
+                    reward += (1 << linesCleared) * 10; // 10, 20, 40, 80
+                }
+                
+                // Penalty for game over
+                if (this.gameOver) {
+                    reward -= 100;
+                    return reward;
+                }
+                
+                // Calculate changes in board metrics
+                const currentHeights = this.getHeights();
+                const currentHoles = this.countHoles();
+                
+                // Penalize increase in height
+                const avgHeightBefore = initialHeights.reduce((a, b) => a + b, 0) / initialHeights.length;
+                const avgHeightAfter = currentHeights.reduce((a, b) => a + b, 0) / currentHeights.length;
+                if (avgHeightAfter > avgHeightBefore) {
+                    reward -= (avgHeightAfter - avgHeightBefore) * 0.5;
+                }
+                
+                // Penalize creating holes
+                if (currentHoles > initialHoles) {
+                    reward -= (currentHoles - initialHoles) * 2;
+                }
+                
+                return reward;
+            }
+            
+            getBoardWithPiece() {
+                const boardWithPiece = JSON.parse(JSON.stringify(this.board));
+                
+                // Add current piece to board
+                for (let y = 0; y < this.currentPiece.length; y++) {
+                    for (let x = 0; x < this.currentPiece[y].length; x++) {
+                        if (this.currentPiece[y][x] !== 0) {
+                            const py = this.currentPos.y + y;
+                            const px = this.currentPos.x + x;
+                            if (py >= 0 && py < this.height && px >= 0 && px < this.width) {
+                                boardWithPiece[py][px] = this.currentPiece[y][x];
+                            }
+                        }
+                    }
+                }
+                
+                return boardWithPiece;
+            }
+            
+            render() {
+                // Clear the canvas
+                this.ctx.fillStyle = '#000';
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                // Draw grid lines
+                this.ctx.strokeStyle = '#333';
+                this.ctx.lineWidth = 1;
+                
+                // Vertical grid lines
+                for (let x = 0; x <= this.width; x++) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(x * this.blockSize, 0);
+                    this.ctx.lineTo(x * this.blockSize, this.height * this.blockSize);
+                    this.ctx.stroke();
+                }
+                
+                // Horizontal grid lines
+                for (let y = 0; y <= this.height; y++) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(0, y * this.blockSize);
+                    this.ctx.lineTo(this.width * this.blockSize, y * this.blockSize);
+                    this.ctx.stroke();
+                }
+                
+                // Draw ghost piece
+                if (!this.gameOver) {
+                    for (let y = 0; y < this.currentPiece.length; y++) {
+                        for (let x = 0; x < this.currentPiece[y].length; x++) {
+                            if (this.currentPiece[y][x] !== 0) {
+                                const pieceValue = this.currentPiece[y][x];
+                                const color = this.pieceColors[pieceValue] || COLORBLIND_COLORS[0];
+                                
+                                // Draw ghost piece as outline
+                                this.ctx.strokeStyle = `rgb(${color[0]},${color[1]},${color[2]})`;
+                                this.ctx.lineWidth = 2;
+                                this.ctx.strokeRect(
+                                    (this.ghostPosition.x + x) * this.blockSize,
+                                    (this.ghostPosition.y + y) * this.blockSize,
+                                    this.blockSize,
+                                    this.blockSize
+                                );
+                            }
+                        }
+                    }
+                }
+                
+                // Get the board with current piece
+                const board = this.getBoardWithPiece();
+                
+                // Draw blocks
+                for (let y = 0; y < this.height; y++) {
+                    for (let x = 0; x < this.width; x++) {
+                        if (board[y][x] !== 0) {
+                            const pieceValue = board[y][x];
+                            const color = this.pieceColors[pieceValue] || COLORBLIND_COLORS[0];
+                            
+                            // Fill block
+                            this.ctx.fillStyle = `rgb(${color[0]},${color[1]},${color[2]})`;
+                            this.ctx.fillRect(
+                                x * this.blockSize,
+                                y * this.blockSize,
+                                this.blockSize,
+                                this.blockSize
+                            );
+                            
+                            // Draw block border
+                            this.ctx.strokeStyle = '#555';
+                            this.ctx.lineWidth = 1;
+                            this.ctx.strokeRect(
+                                x * this.blockSize,
+                                y * this.blockSize,
+                                this.blockSize,
+                                this.blockSize
+                            );
+                        }
+                    }
+                }
+                
+                // Draw particles
+                for (const particle of this.activeParticles) {
+                    // Calculate alpha based on lifetime
+                    const alpha = particle.lifetime / 1.5;
+                    if (alpha <= 0) continue;
+                    
+                    this.ctx.fillStyle = `rgba(${particle.color[0]},${particle.color[1]},${particle.color[2]},${alpha})`;
+                    this.ctx.beginPath();
+                    this.ctx.arc(
+                        particle.x * this.blockSize + this.blockSize / 2,
+                        particle.y * this.blockSize + this.blockSize / 2,
+                        particle.size,
+                        0,
+                        Math.PI * 2
+                    );
+                    this.ctx.fill();
+                }
             }
         }
-
-        function aiStep() {
-            if (gameOver) {
-                clearInterval(aiInterval);
-                resetGame();
-                return;
+        
+        // DQN Agent Implementation
+        class DQNAgent {
+            constructor(stateSize, actionSize) {
+                this.stateSize = stateSize;
+                this.actionSize = actionSize;
+                this.model = null;
+                this.lastAction = null;
+                this.wasRandomAction = false;
+                this.lastQValues = null;
+                
+                // Metrics tracking
+                this.scoreHistory = [];
+                this.avgScore100 = 0;
+                this.maxScore = 0;
+                this.totalGames = 0;
             }
-
-            // Save the current state
-            const state = {
-                board: grid.map(row => [...row]),
-                tetromino: {...currentTetromino},
-                upcomingTypes: upcomingTetrominoes.map(t => t.type)
-            };
-            const action = selectAction();
-            // Execute selected action
-            currentTetromino.orientation = action.rotation;
-            currentTetromino.x = action.x;
-            currentTetromino.y = action.y;
-            const lines = lockTetromino();
-            generateNewTetromino();
-
-            // Calculate penalty for holes and game over penalty
-            const holes = countHolesForBoard(grid);
-            let reward = (lines * lines * 10) - (holes * 2);
-            if (gameOver) reward = -100;
-            episodeReward += reward;
-
-            const nextState = {
-                board: grid.map(row => [...row]),
-                tetromino: {...currentTetromino},
-                upcomingTypes: upcomingTetrominoes.map(t => t.type)
-            };
-            storeExperience(state, action, reward, nextState, gameOver);
-            stepCount++;
-            if (stepCount % 5 === 0) trainModel();
-            epsilon = Math.max(EPSILON_MIN, epsilon * EPSILON_DECAY);
-            render();
+            
+            async loadModel(modelUrl, weightsUrl) {
+                try {
+                    // Load the model from the JSON file
+                    this.model = await tf.loadLayersModel(modelUrl);
+                    console.log("Model loaded successfully");
+                    document.getElementById("model-status").textContent = "Model loaded successfully";
+                    document.getElementById("start-button").disabled = false;
+                    return true;
+                } catch (error) {
+                    console.error("Error loading model:", error);
+                    document.getElementById("model-status").textContent = "Error loading model";
+                    return false;
+                }
+            }
+            
+            predict(state) {
+                return tf.tidy(() => {
+                    // Convert state to tensor
+                    const stateTensor = tf.tensor2d([state], [1, this.stateSize]);
+                    
+                    // Get Q-values
+                    const qValues = this.model.predict(stateTensor);
+                    
+                    // Convert to array and return
+                    return qValues.dataSync();
+                });
+            }
+            
+            act(state) {
+                // Get Q-values
+                const qValues = this.predict(state);
+                this.lastQValues = Array.from(qValues);
+                
+                // Choose best action
+                const action = this.lastQValues.indexOf(Math.max(...this.lastQValues));
+                this.lastAction = action;
+                
+                return action;
+            }
+            
+            getActionExplanation(action) {
+                const rotation = Math.floor(action / 10);
+                const position = action % 10;
+                return `Rotate ${rotation} times, move to column ${position}`;
+            }
+            
+            getQValuesVisualization() {
+                if (!this.lastQValues) return null;
+                
+                const qData = [];
+                for (let i = 0; i < this.lastQValues.length; i++) {
+                    const rotation = Math.floor(i / 10);
+                    const position = i % 10;
+                    qData.push({
+                        action: i,
+                        rotation: rotation,
+                        position: position,
+                        qValue: this.lastQValues[i],
+                        isBest: (i === this.lastAction)
+                    });
+                }
+                
+                // Sort by Q-value (descending)
+                qData.sort((a, b) => b.qValue - a.qValue);
+                
+                return qData;
+            }
+            
+            updateScore(score) {
+                this.scoreHistory.push(score);
+                if (this.scoreHistory.length > 1000) {
+                    this.scoreHistory = this.scoreHistory.slice(-1000);
+                }
+                
+                this.totalGames++;
+                
+                if (score > this.maxScore) {
+                    this.maxScore = score;
+                }
+                
+                this.avgScore100 = this.scoreHistory.length > 0 
+                    ? this.scoreHistory.slice(-100).reduce((a, b) => a + b, 0) / Math.min(100, this.scoreHistory.length) 
+                    : 0;
+            }
         }
-
-        // Event handling
-        document.addEventListener('keydown', (e) => {
-            if (gameOver && e.key === 'Enter') {
-                resetGame();
-                return;
+        
+        // Constants
+        const COLORBLIND_COLORS = [
+            [0, 114, 178],    // Blue
+            [230, 159, 0],    // Orange/Amber
+            [0, 158, 115],    // Green
+            [204, 121, 167],  // Purple
+            [0, 0, 0],        // Black
+            [213, 94, 0],     // Red-Orange
+            [86, 180, 233]    // Light Blue
+        ];
+        
+        // Tetromino shapes
+        const TETROMINOS = {
+            'I': {
+                'shape': [
+                    [0, 0, 0, 0],
+                    [1, 1, 1, 1],
+                    [0, 0, 0, 0],
+                    [0, 0, 0, 0]
+                ]
+            },
+            'J': {
+                'shape': [
+                    [0, 0, 0],
+                    [2, 2, 2],
+                    [0, 0, 2]
+                ]
+            },
+            'L': {
+                'shape': [
+                    [0, 0, 0],
+                    [3, 3, 3],
+                    [3, 0, 0]
+                ]
+            },
+            'O': {
+                'shape': [
+                    [4, 4],
+                    [4, 4]
+                ]
+            },
+            'S': {
+                'shape': [
+                    [0, 0, 0],
+                    [0, 5, 5],
+                    [5, 5, 0]
+                ]
+            },
+            'T': {
+                'shape': [
+                    [0, 0, 0],
+                    [6, 6, 6],
+                    [0, 6, 0]
+                ]
+            },
+            'Z': {
+                'shape': [
+                    [0, 0, 0],
+                    [7, 7, 0],
+                    [0, 7, 7]
+                ]
             }
-            if (gameOver || aiMode) return;
-            switch (e.key) {
-                case 'ArrowLeft': moveLeft(); break;
-                case 'ArrowRight': moveRight(); break;
-                case 'ArrowDown': moveDown(); break;
-                case 'ArrowUp': rotate(); break;
-                case ' ': hardDrop(); break;
+        };
+        
+        // Game state variables
+        let env = new TetrisEnv();
+        const stateSize = 204;  // 20x10 board + 4 for piece encoding
+        const actionSize = 40;  // 10 positions x 4 rotations
+        let agent = new DQNAgent(stateSize, actionSize);
+        let gameRunning = false;
+        let gameSpeedMultiplier = 5;
+        let lastUpdateTime = 0;
+        let gamesPlayed = 0;
+        let scores = [];
+        
+        // UI elements
+        const startButton = document.getElementById('start-button');
+        const pauseButton = document.getElementById('pause-button');
+        const resetButton = document.getElementById('reset-button');
+        const speedSlider = document.getElementById('speed-slider');
+        const speedValue = document.getElementById('speed-value');
+        const modelUpload = document.getElementById('model-upload');
+        const weightsUpload = document.getElementById('weights-upload');
+        const progressBar = document.getElementById('progress-bar');
+        const modelStatus = document.getElementById('model-status');
+        const gameStatus = document.getElementById('game-status');
+        
+        // Stats elements
+        const scoreElement = document.getElementById('score');
+        const linesElement = document.getElementById('lines');
+        const gamesElement = document.getElementById('games');
+        const maxScoreElement = document.getElementById('max-score');
+        const avgScoreElement = document.getElementById('avg-score');
+        
+        // Metrics elements
+        const lastActionElement = document.getElementById('last-action');
+        const holesElement = document.getElementById('holes');
+        const bumpinessElement = document.getElementById('bumpiness');
+        const avgHeightElement = document.getElementById('avg-height');
+        const qValuesElement = document.getElementById('q-values');
+        
+        // Game setup
+        function init() {
+            env = new TetrisEnv();
+            gamesPlayed = 0;
+            scores = [];
+            updateUI();
+            env.render();
+        }
+        
+        // Update UI stats
+        function updateUI() {
+            scoreElement.textContent = env.score;
+            linesElement.textContent = env.linesCleared;
+            gamesElement.textContent = agent.totalGames;
+            maxScoreElement.textContent = agent.maxScore;
+            avgScoreElement.textContent = agent.avgScore100.toFixed(1);
+            
+            // Update metrics
+            holesElement.textContent = env.countHoles();
+            bumpinessElement.textContent = env.getBumpiness();
+            
+            const heights = env.getHeights();
+            const avgHeight = heights.reduce((a, b) => a + b, 0) / heights.length;
+            avgHeightElement.textContent = avgHeight.toFixed(2);
+            
+            if (agent.lastAction !== null) {
+                lastActionElement.textContent = agent.getActionExplanation(agent.lastAction);
             }
-            render();
-        });
-
-        aiToggleButton.addEventListener('click', () => {
-            aiMode = !aiMode;
-            aiToggleButton.textContent = `Toggle AI (${aiMode ? 'On' : 'Off'})`;
-            if (aiMode) {
-                clearInterval(aiInterval);
-                aiInterval = setInterval(aiStep, 2050 - parseInt(speedSlider.value));  // Inverted interval
+            
+            // Update Q-values
+            updateQValues();
+        }
+        
+        // Update Q-values display
+        function updateQValues() {
+            const qData = agent.getQValuesVisualization();
+            if (!qData) return;
+            
+            // Clear existing Q-values
+            qValuesElement.innerHTML = '';
+            
+            // Show top 5 Q-values
+            for (let i = 0; i < Math.min(5, qData.length); i++) {
+                const data = qData[i];
+                const qValueItem = document.createElement('div');
+                qValueItem.className = `q-value-item ${data.isBest ? 'best-action' : ''}`;
+                
+                const actionText = document.createElement('span');
+                actionText.textContent = `Rot=${data.rotation}, Pos=${data.position}`;
+                
+                const qValueText = document.createElement('span');
+                qValueText.textContent = `Q=${data.qValue.toFixed(2)}`;
+                
+                qValueItem.appendChild(actionText);
+                qValueItem.appendChild(qValueText);
+                qValuesElement.appendChild(qValueItem);
+            }
+        }
+        
+        // Game loop
+        function gameLoop(timestamp) {
+            if (!gameRunning) return;
+            
+            // Calculate delta time
+            const deltaTime = (timestamp - lastUpdateTime) / 1000;
+            lastUpdateTime = timestamp;
+            
+            // Update particles
+            env.updateParticles(deltaTime);
+            
+            // AI move at appropriate intervals
+            progressBar.style.width = `${(progressBar.offsetWidth + 1) % 100}%`;
+            
+            // If the game is over, reset it
+            if (env.gameOver) {
+                agent.updateScore(env.score);
+                scores.push(env.score);
+                gamesPlayed++;
+                env.reset();
+                updateUI();
             } else {
-                clearInterval(aiInterval);
-                lastFallTime = performance.now();
+                // Get AI action
+                const state = env.getState();
+                const action = agent.act(state);
+                
+                // Take the action
+                const result = env.step(action);
+                
+                // Update UI
+                updateUI();
+            }
+            
+            // Render the game
+            env.render();
+            
+            // Continue the game loop
+            setTimeout(() => requestAnimationFrame(gameLoop), 1000 / gameSpeedMultiplier);
+        }
+        
+        // Event listeners
+        startButton.addEventListener('click', () => {
+            if (!gameRunning) {
+                gameRunning = true;
+                lastUpdateTime = performance.now();
+                pauseButton.disabled = false;
+                startButton.disabled = true;
+                gameStatus.textContent = "Game running";
                 requestAnimationFrame(gameLoop);
             }
         });
-
+        
+        pauseButton.addEventListener('click', () => {
+            gameRunning = false;
+            pauseButton.disabled = true;
+            startButton.disabled = false;
+            gameStatus.textContent = "Game paused";
+        });
+        
+        resetButton.addEventListener('click', () => {
+            gameRunning = false;
+            pauseButton.disabled = true;
+            startButton.disabled = !agent.model;
+            gameStatus.textContent = "Game reset";
+            init();
+        });
+        
         speedSlider.addEventListener('input', () => {
-            if (aiMode) {
-                clearInterval(aiInterval);
-                aiInterval = setInterval(aiStep, 2050 - parseInt(speedSlider.value));  // Inverted interval
+            gameSpeedMultiplier = parseInt(speedSlider.value);
+            speedValue.textContent = `${gameSpeedMultiplier}x`;
+        });
+        
+        // Model loading
+        modelUpload.addEventListener('change', async (e) => {
+            if (e.target.files.length === 0) return;
+            
+            const file = e.target.files[0];
+            const modelUrl = URL.createObjectURL(file);
+            
+            modelStatus.textContent = "Loading model...";
+            
+            try {
+                // Load model architecture
+                const loaded = await agent.loadModel(modelUrl);
+                if (loaded) {
+                    startButton.disabled = false;
+                    modelStatus.textContent = "Model loaded successfully";
+                } else {
+                    modelStatus.textContent = "Failed to load model";
+                }
+            } catch (error) {
+                console.error("Error loading model:", error);
+                modelStatus.textContent = "Error loading model";
             }
         });
-
-        saveModelButton.addEventListener('click', async () => {
-            await model.save('localstorage://tetris-model');
-            alert('Model saved successfully!');
-        });
-
-        loadModelButton.addEventListener('click', async () => {
-            const loadedModel = await tf.loadLayersModel('localstorage://tetris-model');
-            model.setWeights(loadedModel.getWeights());
-            targetModel.setWeights(loadedModel.getWeights());
-            alert('Model loaded successfully!');
-        });
-
-        // Initialize game
-        upcomingTetrominoes = [generateTetromino(), generateTetromino(), generateTetromino()];
-        currentTetromino = generateTetromino();
-        requestAnimationFrame(gameLoop);
+        
+        // Initialize the game
+        init();
+        
+        // Python to TensorFlow.js model conversion information:
+        /*
+        To convert a TensorFlow/Keras model from Python to TensorFlow.js:
+        
+        1. Install tensorflowjs: pip install tensorflowjs
+        
+        2. Use the converter to convert the .h5 file:
+           tensorflowjs_converter --input_format keras path/to/model.h5 path/to/output_folder
+        
+        3. This will create a model.json file and one or more binary weight files
+        
+        4. Upload these files using the controls above
+        */
     </script>
 </body>
 </html>
