@@ -1119,7 +1119,7 @@ class VisualTetrisDQNTrainer:
                                         self.toggle_step_mode))
         
         # Auto-save checkbox
-        self.ui_elements.append(CheckBox(600, 230, 20, "Auto-Save Every 100 Episodes", True, 
+        self.ui_elements.append(CheckBox(600, 230, 20, "Auto-Save", True, 
                                        self.toggle_autosave))
         
         # Frame skip slider (for speed) - FIXED: Moved to a new line
