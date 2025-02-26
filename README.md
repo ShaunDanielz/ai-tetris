@@ -1,22 +1,32 @@
-# AI Tetris
+# AI Tetris Trainer
 
 ## Project Overview
-AI Tetris is an implementation of the classic Tetris game enhanced with artificial intelligence. The project leverages machine learning, specifically TensorFlow, to train an AI agent to play Tetris autonomously. The AI is trained using a combination of game logic (implemented with Pygame) and a neural network model (built with TensorFlow) to optimize gameplay strategies.
+AI Tetris is an implementation of the classic Tetris game enhanced with artificial intelligence. The project leverages Deep Q-Network (DQN) reinforcement learning, specifically using TensorFlow, to train an AI agent to play Tetris autonomously. The AI is trained using a combination of game logic (implemented with Pygame) and a neural network model (built with TensorFlow) to optimize gameplay strategies.
 
 This project aims to:
-- Demonstrate reinforcement learning or supervised learning techniques applied to a game environment.
-- Utilize GPU acceleration for faster training where available.
-- Provide a fun and educational example of AI in action.
+- Demonstrate reinforcement learning techniques applied to a game environment
+- Utilize GPU acceleration for faster training where available
+- Provide a visual interface for monitoring training progress and AI performance
+- Support model export for web-based applications
 
----
+## Project Structure
+
+The project is organized into the following modules:
+
+- `main.py`: Entry point for the application
+- `config.py`: Configuration settings, constants, and Tetris piece definitions
+- `utils.py`: Utility functions for GPU setup and model conversion
+- `tetris_env.py`: Tetris game environment used for training the AI
+- `dqn_agent.py`: Implementation of the DQN reinforcement learning agent
+- `ui_components.py`: Reusable UI components for the pygame interface
+- `plotting.py`: Utilities for plotting training metrics
+- `trainer_visualization.py`: Main visualization interface for training
 
 ## Prerequisites
 Before setting up the project, ensure you have the following installed:
-- **Anaconda** or **Miniconda**: For managing Python environments and dependencies.
-- **NVIDIA GPU** (optional, for GPU acceleration): Requires compatible drivers installed.
-- **Windows**: This setup is tested on Windows, but it can be adapted for other platforms.
-
----
+- **Anaconda** or **Miniconda**: For managing Python environments and dependencies
+- **NVIDIA GPU** (optional, for GPU acceleration): Requires compatible drivers installed
+- **Windows**: This setup is tested on Windows, but it can be adapted for other platforms
 
 ## Environment Setup with Conda
 To ensure a consistent and isolated environment, this project uses Conda to manage dependencies. Follow these steps to set up the environment with Python 3.10 and TensorFlow 2.10.0, optimized for GPU support.
@@ -45,19 +55,22 @@ Install the required packages, including TensorFlow with GPU support, Pygame, an
 
 #### Core Dependencies
 ```bash
-conda install -c conda-forge cudatoolkit=11.2 cudnn=8.1 tensorflow-gpu=2.10.0 pygame
+conda install -c conda-forge cudatoolkit=11.2 cudnn=8.1 tensorflow-gpu=2.10.0 pygame matplotlib
 pip install "numpy<2.0" psutil
 ```
 
-- **TensorFlow 2.10.0**: Chosen for its stability and GPU support with CUDA 11.2.
-- **CUDA 11.2 and cuDNN 8.1**: Required for TensorFlow 2.10.0 GPU support, installed via Conda to avoid system-wide conflicts.
-- **NumPy <2.0**: TensorFlow 2.10.0 is incompatible with NumPy 2.x due to breaking changes; this ensures compatibility.
-- **Pygame**: Used for the Tetris game environment.
-- **psutil**: Optional utility for monitoring system resources (e.g., CPU usage).
+- **TensorFlow 2.10.0**: Chosen for its stability and GPU support with CUDA 11.2
+- **CUDA 11.2 and cuDNN 8.1**: Required for TensorFlow 2.10.0 GPU support, installed via Conda to avoid system-wide conflicts
+- **NumPy <2.0**: TensorFlow 2.10.0 is incompatible with NumPy 2.x due to breaking changes; this ensures compatibility
+- **Pygame**: Used for the Tetris game environment and visualization
+- **Matplotlib**: Used for plotting training metrics
+- **psutil**: Utility for monitoring system resources during training
 
-#### Why These Versions?
-- TensorFlow 2.10.0 is the last version to support GPU acceleration on native Windows without requiring WSL2, making it ideal for this setup.
-- CUDA 11.2 and cuDNN 8.1 match TensorFlow 2.10.0's requirements for GPU support.
+#### Optional Dependencies
+For web export capability (optional):
+```bash
+pip install tensorflowjs
+```
 
 ### Step 5: Verify GPU Support
 After installation, test if TensorFlow can detect your GPU:
@@ -67,28 +80,50 @@ python -c "import tensorflow as tf; print('GPU available' if tf.config.list_phys
 - Expected output: `GPU available`
 - If it says `No GPU available`, see the troubleshooting section below.
 
----
-
 ## Running the Project
 To train the AI or play the game:
-1. Ensure you’re in the `tetris_ai` environment:
+1. Ensure you're in the `tetris_ai` environment:
    ```bash
    conda activate tetris_ai
    ```
 2. Run the main script:
    ```bash
-   python ai_trainer_full.py
+   python main.py
    ```
-   - If no saved model is found, it starts fresh training.
-   - Training will use the GPU if detected; otherwise, it falls back to CPU (slower).
+   - If no saved model is found, it starts fresh training
+   - Training will use the GPU if detected; otherwise, it falls back to CPU (slower)
 
----
+## Training Interface
 
-## Project Structure
-- `ai_trainer_full.py`: Main script containing the game logic, AI model, and training loop.
-- Other files (to be added as needed): May include model definitions, utilities, or saved weights.
+The application provides a visual interface with several tabs:
 
----
+- **Training**: Main controls for starting/pausing training, saving/loading models
+- **Metrics**: Graphs of loss, reward, score, and exploration rate
+- **Network**: Visualization of neural network structure and Q-values
+- **Board Analysis**: Analysis of the current game state and board metrics
+- **Performance**: Performance metrics for the training process
+- **Web Export**: Tools for exporting models for web-based use
+
+## Controls
+
+- **Start/Pause Training**: Toggle training process
+- **Step**: Perform a single training step (useful in step mode)
+- **Save Model**: Save the current model weights
+- **Load Model**: Load model weights from a file
+- **Reset**: Reset the training process
+- **Export for Web**: Export the model for use in web applications
+
+## Key Parameters
+
+You can adjust several parameters during training:
+- **Training Speed**: Control the speed of the training process
+- **Exploration Rate (ε)**: Control the agent's exploration vs. exploitation balance
+- **Frame Skip**: Skip rendering frames to increase training speed
+- **Display options**: Toggle heatmap, Q-values, and ghost piece visualization
+
+## Model Export
+
+Models are automatically saved during training. They can also be exported to TensorFlow.js format for use in web applications. The exported models are saved in the `models/tetris_dqn/web_model_latest/` directory.
 
 ## Troubleshooting GPU Issues
 If TensorFlow fails to detect your GPU (`No GPU available`), you may see warnings like:
@@ -120,17 +155,12 @@ Skipping registering GPU devices...
      ```
 
 4. **System CUDA Conflict**:
-   - If you have CUDA 12.2 installed system-wide (check with `nvcc --version`), it won’t affect the Conda environment since `cudatoolkit` is isolated. Avoid modifying the system PATH unless necessary.
-
----
+   - If you have CUDA 12.2 installed system-wide (check with `nvcc --version`), it won't affect the Conda environment since `cudatoolkit` is isolated. Avoid modifying the system PATH unless necessary.
 
 ## Notes
 - **Performance**: GPU training is significantly faster than CPU. Ensure GPU support is working for optimal performance.
 - **Upgrading TensorFlow**: If you prefer a newer TensorFlow version (e.g., 2.13.0 with CUDA 12.0), adjust the `cudatoolkit` version accordingly, but note that versions >=2.11 require WSL2 on Windows for GPU support.
 - **Contributing**: Feel free to submit pull requests or issues to improve the project!
 
----
-
 ## License
 This project is open-source under the [MIT License](https://github.com/ShaunDanielz/ai-tetris/blob/main/LICENSE.md).
-
