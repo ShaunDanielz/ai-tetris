@@ -1009,9 +1009,9 @@ class VisualTetrisDQNTrainer:
                 # Print progress
                 if self.episode % 10 == 0:
                     print(f"Episode {self.episode}/{self.episodes}, " +
-                          f"Score: {self.env.score}, " +
-                          f"Epsilon: {self.agent.epsilon:.4f}, " +
-                          f"Memory: {len(self.agent.memory)}/{self.agent.memory.maxlen}")
+                        f"Score: {self.env.score}, " +
+                        f"Epsilon: {self.agent.epsilon:.4f}, " +
+                        f"Memory: {len(self.agent.memory)}/{self.agent.memory.maxlen}")
             
             # Reset do_step flag
             self.do_step = False
@@ -1034,6 +1034,34 @@ class VisualTetrisDQNTrainer:
         # Train the model
         if len(self.agent.memory) > self.agent.batch_size:
             self.agent.replay(self.agent.batch_size)
+        
+        # Handle game over when training is active
+        if self.env.game_over:
+            # Update agent score
+            self.agent.update_score(self.env.score)
+            
+            # Start a new episode
+            self.reset_game()
+            self.episode += 1
+            
+            # Update target network periodically
+            if self.episode % self.target_update_freq == 0:
+                self.agent.update_target_model()
+                print(f"Episode {self.episode}: Target network updated")
+                
+            # Print progress
+            if self.episode % 10 == 0:
+                print(f"Episode {self.episode}/{self.episodes}, " +
+                    f"Score: {self.env.score}, " +
+                    f"Epsilon: {self.agent.epsilon:.4f}, " +
+                    f"Memory: {len(self.agent.memory)}/{self.agent.memory.maxlen}")
+            
+            # Auto-save if enabled
+            if self.auto_save_enabled and self.episode > 0:
+                if self.episode % 100 == 0:
+                    self.save_model_auto()
+                if self.episode % 1000 == 0:
+                    self.save_milestone()
         
         # Reset do_step flag
         self.do_step = False
