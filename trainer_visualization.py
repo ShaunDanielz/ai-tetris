@@ -886,7 +886,8 @@ class VisualTetrisDQNTrainer:
     def render_web_export_tab(self):
         """Render content for the Web Export tab"""
         export_x = 420
-        export_y = 290
+        # Increase export_y to move the panel downward (e.g., from 290 to 350 or higher)
+        export_y = 350  # Adjusted to provide more space below the checkboxes
         panel_width = 740
         panel_height = 300
         
@@ -921,7 +922,7 @@ class VisualTetrisDQNTrainer:
             "",
             f"Last export: {datetime.fromtimestamp(self.last_web_export_time).strftime('%Y-%m-%d %H:%M:%S') if self.last_web_export_time else 'Never'}"
         ]
-    
+        
         for i, text in enumerate(info_text):
             text_surf = self.font.render(text, True, WHITE)
             self.screen.blit(text_surf, (export_x + 15, export_y + 50 + i * 20))
