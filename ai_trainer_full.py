@@ -1091,6 +1091,12 @@ class VisualTetrisDQNTrainer:
                                       (120, 0, 0), (180, 0, 0), 
                                       self.reset_training))
         
+        # Adjusted placement (next to "Reset")
+        self.ui_elements.append(Button("Export for Web", 990, 100, 140, 30, 
+                               (0, 100, 180), (0, 140, 220), 
+                               self.export_for_web))
+
+        
         # Training speed slider
         self.ui_elements.append(Slider(420, 160, 250, 10, 0.5, 10.0, 1.0, 
                                       "Training Speed", self.set_training_speed))
@@ -1122,12 +1128,7 @@ class VisualTetrisDQNTrainer:
         
         # Auto-export to web checkbox
         self.ui_elements.append(CheckBox(800, 230, 20, "Auto-Export for Web", True, 
-                                        self.toggle_auto_web_export))
-
-        # Web export button
-        self.ui_elements.append(Button("Export for Web", 900, 230, 120, 30, 
-                                    (0, 100, 180), (0, 140, 220), 
-                                    self.export_for_web))
+                                        self.toggle_auto_web_export))      
 
     
     def set_training_speed(self, value):
