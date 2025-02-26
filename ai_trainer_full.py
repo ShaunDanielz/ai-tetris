@@ -1645,7 +1645,7 @@ class VisualTetrisDQNTrainer:
         
         # Draw board analysis
         metrics_width = 360
-        metrics_height = 180
+        metrics_height = 210
         
         # Background
         pygame.draw.rect(self.screen, (40, 40, 40), 
@@ -1673,7 +1673,7 @@ class VisualTetrisDQNTrainer:
         heights_x = analysis_x + metrics_width + 20
         heights_y = analysis_y
         heights_width = 360
-        heights_height = 180
+        heights_height = 210
         
         # Background
         pygame.draw.rect(self.screen, (40, 40, 40), 
