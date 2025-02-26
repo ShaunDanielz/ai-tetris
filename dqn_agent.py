@@ -10,6 +10,7 @@ exploration and maintains a target network for stable training.
 
 import os
 import time
+import random  # Make sure this import is present
 import numpy as np
 import tensorflow as tf
 from collections import deque
@@ -112,7 +113,8 @@ class DQNAgent:
         # Measure training time
         start_time = time.time()
         
-        minibatch = np.random.choice(self.memory, batch_size, replace=False)
+        # FIX: Use random.sample instead of np.random.choice
+        minibatch = random.sample(list(self.memory), batch_size)
         
         states = np.array([experience[0] for experience in minibatch])
         actions = np.array([experience[1] for experience in minibatch])
