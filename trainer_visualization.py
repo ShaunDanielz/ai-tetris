@@ -41,6 +41,10 @@ class VisualTetrisDQNTrainer:
         self.screen = pygame.display.set_mode((self.window_width, self.window_height))
         pygame.display.set_caption("Enhanced Tetris DQN Training Visualizer")
         
+        # Get GPU information once at initialization
+        from utils import setup_gpu
+        self.device_info = setup_gpu()
+        
         # UI state
         self.tab_manager = TabManager(400, 50, 800, 30)
         self.tab_manager.add_tab("Training")
@@ -795,7 +799,6 @@ class VisualTetrisDQNTrainer:
 
         perf_y = checkbox_y_position + checkbox_height + gap  # Move it down
 
-
         panel_width = 360
         panel_height = 250  # Increased from 200 to 230 for better text fit
         
@@ -807,24 +810,22 @@ class VisualTetrisDQNTrainer:
         title = self.big_font.render("Performance Metrics", True, WHITE)
         self.screen.blit(title, (perf_x + 10, perf_y + 10))
         
-        # Show GPU status
-        from utils import setup_gpu
-        device_info = setup_gpu()
-        using_gpu = device_info['using_gpu']
+        # Show GPU status using the stored device_info
+        using_gpu = self.device_info['using_gpu']
         gpu_status = f"GPU: {'Enabled' if using_gpu else 'Disabled (using CPU)'}"
         gpu_text = self.font.render(gpu_status, True, (100, 255, 100) if using_gpu else (255, 100, 100))
         self.screen.blit(gpu_text, (perf_x + 15, perf_y + 45))
         
         # Display GPU details if available
-        if using_gpu and device_info['gpu_names']:
-            for i, name in enumerate(device_info['gpu_names']):
+        if using_gpu and self.device_info['gpu_names']:
+            for i, name in enumerate(self.device_info['gpu_names']):
                 gpu_name = self.small_font.render(f"GPU {i+1}: {name}", True, WHITE)
                 self.screen.blit(gpu_name, (perf_x + 15, perf_y + 70 + i * 20))
             
             mem_growth = self.small_font.render(
-                f"Memory Growth: {'Enabled' if device_info['memory_growth_enabled'] else 'Disabled'}", 
+                f"Memory Growth: {'Enabled' if self.device_info['memory_growth_enabled'] else 'Disabled'}", 
                 True, WHITE)
-            self.screen.blit(mem_growth, (perf_x + 15, perf_y + 70 + len(device_info['gpu_names']) * 20))
+            self.screen.blit(mem_growth, (perf_x + 15, perf_y + 70 + len(self.device_info['gpu_names']) * 20))
         
         # Timing information
         y_offset = perf_y + 140  # Increased from 120 to 140 for spacing
@@ -881,8 +882,8 @@ class VisualTetrisDQNTrainer:
             buffer_memory = (sample_size * len(self.agent.memory)) / (1024 * 1024)  # in MB
             
             buffer_mem_text = self.font.render(f"Buffer Memory: {buffer_memory:.1f} MB", True, WHITE)
-            self.screen.blit(buffer_mem_text, (perf2_x + 15, perf_y + 95))
-    
+            self.screen.blit(buffer_mem_text, (perf2_x + 15, perf_y + 95))    
+
     def render_web_export_tab(self):
         """Render content for the Web Export tab"""
         export_x = 420
