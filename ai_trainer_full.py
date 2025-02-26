@@ -1713,7 +1713,14 @@ class VisualTetrisDQNTrainer:
     def render_performance_tab(self):
         """Render content for the Performance tab"""
         perf_x = 420
-        perf_y = 290  # FIXED: Moved down to avoid overlapping with Frame Skip slider
+        
+        checkbox_y_position = 250  # Y position of the last checkbox row
+        checkbox_height = 30  # Estimated height of checkboxes
+        gap = 50  # Additional spacing
+
+        perf_y = checkbox_y_position + checkbox_height + gap  # Move it down
+
+
         panel_width = 360
         panel_height = 200
         
