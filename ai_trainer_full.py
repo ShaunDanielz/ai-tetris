@@ -1525,7 +1525,13 @@ class VisualTetrisDQNTrainer:
     def render_network_tab(self):
         """Render content for the Network tab"""
         network_x = 420
-        network_y = 290  # FIXED: Moved down to avoid overlapping with Frame Skip slider
+        
+        checkbox_y_position = 250  # Y position of the last checkbox row
+        checkbox_height = 30  # Estimated height of checkboxes
+        gap = 50  # Additional spacing
+
+        network_y = checkbox_y_position + checkbox_height + gap  # Move it down
+
         
         # Draw neural network structure
         nn_width = 740
@@ -1624,7 +1630,13 @@ class VisualTetrisDQNTrainer:
     def render_board_analysis_tab(self):
         """Render content for the Board Analysis tab"""
         analysis_x = 420
-        analysis_y = 290  # FIXED: Moved down to avoid overlapping with Frame Skip slider
+        
+        checkbox_y_position = 250  # Y position of the last checkbox row
+        checkbox_height = 30  # Estimated height of checkboxes
+        gap = 50  # Additional spacing
+
+        analysis_y = checkbox_y_position + checkbox_height + gap  # Move it down
+    
         
         # Board metrics
         heights = self.env.get_heights()
