@@ -1489,7 +1489,14 @@ class VisualTetrisDQNTrainer:
     def render_metrics_tab(self):
         """Render content for the Metrics tab"""
         metrics_x = 420
-        metrics_y = 290  # FIXED: Moved down to avoid overlapping with Frame Skip slider
+        
+        checkbox_y_position = 250  # Y position of the last row of checkboxes
+        checkbox_height = 30  # Estimated height of checkboxes
+        gap = 50  # Add some spacing for clarity
+
+        metrics_y = checkbox_y_position + checkbox_height + gap  # Adjusted Y position
+        metrics_x = 420  # Keep X position the same
+
         
         # Draw plots
         plot_width = 360
