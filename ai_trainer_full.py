@@ -1722,7 +1722,7 @@ class VisualTetrisDQNTrainer:
 
 
         panel_width = 360
-        panel_height = 200
+        panel_height = 250  # Increased from 200 to 230 for better text fit
         
         # Background
         pygame.draw.rect(self.screen, (40, 40, 40), 
@@ -1750,7 +1750,7 @@ class VisualTetrisDQNTrainer:
             self.screen.blit(mem_growth, (perf_x + 15, perf_y + 70 + len(device_info['gpu_names']) * 20))
         
         # Timing information
-        y_offset = perf_y + 120
+        y_offset = perf_y + 140  # Increased from 120 to 140 for spacing
         
         # Get model performance stats
         stats = self.agent.get_performance_stats()
