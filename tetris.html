@@ -399,6 +399,10 @@
                     }
                 }
                 
+                // Sort lines in descending order before removing them
+                // This is the key fix for the floating blocks issue
+                linesToClear.sort((a, b) => b - a);
+                
                 // Remove the lines
                 for (let y of linesToClear) {
                     // Remove the line
