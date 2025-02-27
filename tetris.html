@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -16,25 +17,30 @@
             flex-direction: column;
             align-items: center;
         }
+
         h1 {
             color: #ffffff;
             margin-bottom: 10px;
         }
+
         .container {
             display: flex;
             gap: 20px;
             margin-top: 20px;
         }
+
         .game-container {
             display: flex;
             flex-direction: column;
             align-items: center;
         }
+
         .tetris-board {
             border: 2px solid #555;
             background-color: #000;
             position: relative;
         }
+
         .stats-container {
             background-color: #333;
             border-radius: 5px;
@@ -42,6 +48,7 @@
             width: 300px;
             margin-top: 20px;
         }
+
         .stats-title {
             font-size: 18px;
             font-weight: bold;
@@ -49,11 +56,13 @@
             border-bottom: 1px solid #555;
             padding-bottom: 5px;
         }
+
         .stats-row {
             display: flex;
             justify-content: space-between;
             margin: 5px 0;
         }
+
         .control-panel {
             display: flex;
             flex-direction: column;
@@ -62,6 +71,7 @@
             padding: 15px;
             width: 300px;
         }
+
         button {
             background-color: #4a6da7;
             color: white;
@@ -73,16 +83,20 @@
             font-size: 16px;
             transition: background-color 0.2s;
         }
+
         button:hover {
             background-color: #5a7db7;
         }
+
         button:disabled {
             background-color: #555;
             cursor: not-allowed;
         }
+
         .file-input {
             margin: 10px 0;
         }
+
         .status {
             margin-top: 10px;
             padding: 10px;
@@ -90,23 +104,29 @@
             font-size: 14px;
             background-color: #444;
         }
+
         .model-status {
             color: #ffaa00;
         }
+
         .speed-control {
             margin: 10px 0;
         }
+
         label {
             display: block;
             margin-bottom: 5px;
         }
+
         input[type="range"] {
             width: 100%;
         }
+
         .ghost-piece {
             opacity: 0.3;
             position: absolute;
         }
+
         .metrics-container {
             display: flex;
             flex-direction: column;
@@ -116,11 +136,13 @@
             width: 300px;
             margin-top: 20px;
         }
+
         .q-values {
             margin-top: 10px;
             max-height: 200px;
             overflow-y: auto;
         }
+
         .q-value-item {
             display: flex;
             justify-content: space-between;
@@ -128,9 +150,11 @@
             padding: 5px;
             border-radius: 3px;
         }
+
         .best-action {
             background-color: rgba(0, 200, 0, 0.2);
         }
+
         .progress-container {
             width: 100%;
             background-color: #444;
@@ -139,6 +163,7 @@
             margin: 10px 0;
             overflow: hidden;
         }
+
         .progress-bar {
             height: 100%;
             background-color: #4a6da7;
@@ -147,14 +172,15 @@
         }
     </style>
 </head>
+
 <body>
     <h1>Tetris DQN AI Player</h1>
     <p>Watch an AI play Tetris using a pre-trained Deep Q-Network model</p>
-    
+
     <div class="container">
         <div class="game-container">
             <canvas id="tetris-canvas" class="tetris-board" width="300" height="600"></canvas>
-            
+
             <div class="stats-container">
                 <div class="stats-title">Game Stats</div>
                 <div class="stats-row">
@@ -179,46 +205,46 @@
                 </div>
             </div>
         </div>
-        
+
         <div class="control-panel">
             <h3>Controls</h3>
-            
+
             <div class="file-input">
                 <label for="model-upload">Upload Model JSON:</label>
                 <input type="file" id="model-upload" accept=".json">
             </div>
-            
+
             <div class="file-input">
                 <label for="weights-upload">Upload Weights File (.bin):</label>
                 <input type="file" id="weights-upload" accept=".bin">
             </div>
-            
+
             <div class="model-info" id="model-info" style="margin-top: 10px; font-size: 12px; color: #aaa;">
                 1. First select the model.json file
                 2. Then select the matching weights.bin file
                 3. Both files must be selected before the model can be loaded
             </div>
-            
+
             <button id="start-button" disabled>Start AI</button>
             <button id="pause-button" disabled>Pause</button>
             <button id="reset-button">Reset Game</button>
-            
+
             <div class="speed-control">
                 <label for="speed-slider">Game Speed:</label>
                 <input type="range" id="speed-slider" min="1" max="20" value="5">
                 <span id="speed-value">5x</span>
             </div>
-            
+
             <div class="status">
                 <div class="model-status" id="model-status">Model not loaded</div>
                 <div id="game-status">Game ready</div>
             </div>
-            
+
             <div class="progress-container">
                 <div class="progress-bar" id="progress-bar"></div>
             </div>
         </div>
-        
+
         <div class="metrics-container">
             <h3>AI Metrics</h3>
             <div class="stats-row">
@@ -237,7 +263,7 @@
                 <span>Avg Height:</span>
                 <span id="avg-height">0</span>
             </div>
-            
+
             <h4>Top Q-Values</h4>
             <div class="q-values" id="q-values">
                 <!-- Q-values will be added here -->
@@ -265,8 +291,9 @@
                 this.blockSize = 30; // Size of each block in pixels
                 this.reset();
             }
-            
+
             reset() {
+                // Create a fresh board filled with zeros
                 this.board = Array(this.height).fill().map(() => Array(this.width).fill(0));
                 this.score = 0;
                 this.linesCleared = 0;
@@ -276,47 +303,48 @@
                 this._newPiece();
                 return this.getState();
             }
-            
+
             _newPiece() {
                 const tetrominoKeys = Object.keys(TETROMINOS);
                 const randomKey = tetrominoKeys[Math.floor(Math.random() * tetrominoKeys.length)];
                 this.currentPiece = JSON.parse(JSON.stringify(TETROMINOS[randomKey].shape));
-                
+
                 // Start position
                 this.currentPos = {
                     x: Math.floor(this.width / 2) - Math.floor(this.currentPiece[0].length / 2),
                     y: 0
                 };
-                
+
                 // Assign a random color to this piece
                 const pieceValue = Math.max(...this.currentPiece.flat());
                 if (pieceValue > 0 && !this.pieceColors[pieceValue]) {
                     this.pieceColors[pieceValue] = COLORBLIND_COLORS[Math.floor(Math.random() * COLORBLIND_COLORS.length)];
                 }
-                
+
                 // Update ghost piece position
                 this._updateGhostPosition();
-                
+
                 // Check if game is over (collision on spawn)
                 if (this._checkCollision(0, 0)) {
                     this.gameOver = true;
                 }
             }
-            
+
             _checkCollision(dx = 0, dy = 0) {
                 for (let y = 0; y < this.currentPiece.length; y++) {
                     for (let x = 0; x < this.currentPiece[y].length; x++) {
                         if (this.currentPiece[y][x] === 0) continue;
-                        
+
                         const newX = this.currentPos.x + x + dx;
                         const newY = this.currentPos.y + y + dy;
-                        
+
                         // Check if out of bounds
                         if (newX < 0 || newX >= this.width || newY >= this.height) {
                             return true;
                         }
-                        
+
                         // Check if collision with placed pieces
+                        // Only check cells that are actually on the board (newY >= 0)
                         if (newY >= 0 && this.board[newY][newX] !== 0) {
                             return true;
                         }
@@ -324,25 +352,25 @@
                 }
                 return false;
             }
-            
+
             _updateGhostPosition() {
                 this.ghostPosition = { x: this.currentPos.x, y: this.currentPos.y };
-                
+
                 // Drop as far as possible
                 while (!this._checkCollision(0, this.ghostPosition.y - this.currentPos.y + 1)) {
                     this.ghostPosition.y += 1;
                 }
             }
-            
+
             _rotatePiece(clockwise = true) {
                 // Make a copy of the current piece
                 const originalPiece = JSON.parse(JSON.stringify(this.currentPiece));
-                
+
                 // Transpose
                 const rows = this.currentPiece.length;
                 const cols = this.currentPiece[0].length;
                 const rotated = Array(cols).fill().map(() => Array(rows).fill(0));
-                
+
                 for (let y = 0; y < rows; y++) {
                     for (let x = 0; x < cols; x++) {
                         if (clockwise) {
@@ -352,35 +380,43 @@
                         }
                     }
                 }
-                
+
                 this.currentPiece = rotated;
-                
+
                 // Check if rotation causes collision
                 if (this._checkCollision()) {
                     // Revert rotation
                     this.currentPiece = originalPiece;
                     return false;
                 }
-                
+
                 // Update ghost position after rotation
                 this._updateGhostPosition();
                 return true;
             }
-            
+
             _mergePiece() {
+                // This ensures the piece is properly merged with the board
                 for (let y = 0; y < this.currentPiece.length; y++) {
                     for (let x = 0; x < this.currentPiece[y].length; x++) {
                         if (this.currentPiece[y][x] !== 0) {
-                            this.board[this.currentPos.y + y][this.currentPos.x + x] = this.currentPiece[y][x];
+                            const boardY = this.currentPos.y + y;
+                            const boardX = this.currentPos.x + x;
+
+                            // Only merge if within board boundaries
+                            if (boardY >= 0 && boardY < this.height &&
+                                boardX >= 0 && boardX < this.width) {
+                                this.board[boardY][boardX] = this.currentPiece[y][x];
+                            }
                         }
                     }
                 }
             }
-            
+
             _clearLines() {
                 let linesCleared = 0;
                 const linesToClear = [];
-                
+
                 // Find lines to clear
                 for (let y = 0; y < this.height; y++) {
                     if (this.board[y].every(cell => cell !== 0)) {
@@ -388,7 +424,7 @@
                         linesCleared += 1;
                     }
                 }
-                
+
                 // Create particles for cleared lines
                 for (let y of linesToClear) {
                     for (let x = 0; x < this.width; x++) {
@@ -398,11 +434,10 @@
                         }
                     }
                 }
-                
+
                 // Sort lines in descending order before removing them
-                // This is the key fix for the floating blocks issue
                 linesToClear.sort((a, b) => b - a);
-                
+
                 // Remove the lines
                 for (let y of linesToClear) {
                     // Remove the line
@@ -410,17 +445,17 @@
                     // Add a new empty line at the top
                     this.board.unshift(Array(this.width).fill(0));
                 }
-                
+
                 return linesCleared;
             }
-            
+
             _addParticle(x, y, pieceValue) {
                 const color = this.pieceColors[pieceValue] || COLORBLIND_COLORS[0];
-                
+
                 // Random velocity for the particle
                 const vx = (Math.random() - 0.5) * 4;
                 const vy = -(Math.random() * 3 + 2); // Up direction
-                
+
                 // Create particle
                 this.activeParticles.push({
                     x: x,
@@ -432,30 +467,30 @@
                     size: Math.random() * 4 + 2 // 2 to 6 pixels
                 });
             }
-            
+
             updateParticles(dt) {
                 const gravity = 9.8;
-                
+
                 for (let i = this.activeParticles.length - 1; i >= 0; i--) {
                     const particle = this.activeParticles[i];
-                    
+
                     // Update position
                     particle.x += particle.vx * dt;
                     particle.y += particle.vy * dt;
-                    
+
                     // Apply gravity
                     particle.vy += gravity * dt;
-                    
+
                     // Reduce lifetime
                     particle.lifetime -= dt;
-                    
+
                     // Remove expired particles
                     if (particle.lifetime <= 0) {
                         this.activeParticles.splice(i, 1);
                     }
                 }
             }
-            
+
             getHeights() {
                 const heights = [];
                 for (let x = 0; x < this.width; x++) {
@@ -467,7 +502,7 @@
                 }
                 return heights;
             }
-            
+
             countHoles() {
                 let holes = 0;
                 for (let x = 0; x < this.width; x++) {
@@ -482,7 +517,7 @@
                 }
                 return holes;
             }
-            
+
             getBumpiness() {
                 const heights = this.getHeights();
                 let bumpiness = 0;
@@ -491,11 +526,11 @@
                 }
                 return bumpiness;
             }
-            
+
             getState() {
                 // Flatten the board to 1s and 0s
                 const flatBoard = this.board.flat().map(cell => cell > 0 ? 1 : 0);
-                
+
                 // Encode current piece type (one-hot)
                 let pieceType = -1;
                 for (let i = 0; i < Object.keys(TETROMINOS).length; i++) {
@@ -508,7 +543,7 @@
                         break;
                     }
                 }
-                
+
                 // Binary encoding of piece type + normalized x position
                 const pieceEncoding = [0, 0, 0, 0];
                 if (pieceType >= 0) {
@@ -517,10 +552,10 @@
                     pieceEncoding[2] = (pieceType & 4) ? 1 : 0;
                     pieceEncoding[3] = this.currentPos.x / this.width; // Normalized x position
                 }
-                
+
                 return flatBoard.concat(pieceEncoding);
             }
-            
+
             step(action) {
                 if (this.gameOver) {
                     return {
@@ -530,31 +565,31 @@
                         info: {}
                     };
                 }
-                
+
                 // Save the initial state for reward calculation
                 const initialBoard = JSON.parse(JSON.stringify(this.board));
                 const initialHeights = this.getHeights();
                 const initialHoles = this.countHoles();
-                
+
                 // Decode action
                 const rotation = Math.floor(action / 10) % 4;
                 const position = action % 10;
-                
+
                 // Perform rotation
                 for (let i = 0; i < rotation; i++) {
                     this._rotatePiece();
                 }
-                
+
                 // Move to target x position
                 const currentX = this.currentPos.x;
                 let targetX = position;
-                
+
                 // Adjust for piece width
                 const pieceWidth = this.currentPiece[0].length;
                 if (targetX + pieceWidth > this.width) {
                     targetX = this.width - pieceWidth;
                 }
-                
+
                 // Move horizontally
                 const dx = targetX - currentX;
                 if (dx < 0) {
@@ -576,28 +611,28 @@
                         }
                     }
                 }
-                
+
                 // Drop the piece all the way down
                 while (!this._checkCollision(0, 1)) {
                     this.currentPos.y += 1;
                 }
-                
+
                 // Merge piece and check for cleared lines
                 this._mergePiece();
                 const linesCleared = this._clearLines();
-                
+
                 // Update score
                 if (linesCleared > 0) {
                     this.score += (1 << linesCleared) * 100; // 100, 200, 400, 800
                     this.linesCleared += linesCleared;
                 }
-                
+
                 // Get new piece
                 this._newPiece();
-                
+
                 // Calculate reward
                 const reward = this._calculateReward(initialBoard, initialHeights, initialHoles, linesCleared);
-                
+
                 return {
                     state: this.getState(),
                     reward: reward,
@@ -605,46 +640,46 @@
                     info: { linesCleared: linesCleared }
                 };
             }
-            
+
             _calculateReward(initialBoard, initialHeights, initialHoles, linesCleared) {
                 let reward = 0;
-                
+
                 // Base reward for surviving
                 reward += 0.1;
-                
+
                 // Reward for clearing lines
                 if (linesCleared > 0) {
                     reward += (1 << linesCleared) * 10; // 10, 20, 40, 80
                 }
-                
+
                 // Penalty for game over
                 if (this.gameOver) {
                     reward -= 100;
                     return reward;
                 }
-                
+
                 // Calculate changes in board metrics
                 const currentHeights = this.getHeights();
                 const currentHoles = this.countHoles();
-                
+
                 // Penalize increase in height
                 const avgHeightBefore = initialHeights.reduce((a, b) => a + b, 0) / initialHeights.length;
                 const avgHeightAfter = currentHeights.reduce((a, b) => a + b, 0) / currentHeights.length;
                 if (avgHeightAfter > avgHeightBefore) {
                     reward -= (avgHeightAfter - avgHeightBefore) * 0.5;
                 }
-                
+
                 // Penalize creating holes
                 if (currentHoles > initialHoles) {
                     reward -= (currentHoles - initialHoles) * 2;
                 }
-                
+
                 return reward;
             }
-            
+
             getBoardWithPiece() {
                 const boardWithPiece = JSON.parse(JSON.stringify(this.board));
-                
+
                 // Add current piece to board
                 for (let y = 0; y < this.currentPiece.length; y++) {
                     for (let x = 0; x < this.currentPiece[y].length; x++) {
@@ -657,19 +692,19 @@
                         }
                     }
                 }
-                
+
                 return boardWithPiece;
             }
-            
+
             render() {
                 // Clear the canvas
                 this.ctx.fillStyle = '#000';
                 this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-                
+
                 // Draw grid lines
                 this.ctx.strokeStyle = '#333';
                 this.ctx.lineWidth = 1;
-                
+
                 // Vertical grid lines
                 for (let x = 0; x <= this.width; x++) {
                     this.ctx.beginPath();
@@ -677,7 +712,7 @@
                     this.ctx.lineTo(x * this.blockSize, this.height * this.blockSize);
                     this.ctx.stroke();
                 }
-                
+
                 // Horizontal grid lines
                 for (let y = 0; y <= this.height; y++) {
                     this.ctx.beginPath();
@@ -685,7 +720,7 @@
                     this.ctx.lineTo(this.width * this.blockSize, y * this.blockSize);
                     this.ctx.stroke();
                 }
-                
+
                 // Draw ghost piece
                 if (!this.gameOver) {
                     for (let y = 0; y < this.currentPiece.length; y++) {
@@ -693,7 +728,7 @@
                             if (this.currentPiece[y][x] !== 0) {
                                 const pieceValue = this.currentPiece[y][x];
                                 const color = this.pieceColors[pieceValue] || COLORBLIND_COLORS[0];
-                                
+
                                 // Draw ghost piece as outline
                                 this.ctx.strokeStyle = `rgb(${color[0]},${color[1]},${color[2]})`;
                                 this.ctx.lineWidth = 2;
@@ -707,17 +742,17 @@
                         }
                     }
                 }
-                
+
                 // Get the board with current piece
                 const board = this.getBoardWithPiece();
-                
+
                 // Draw blocks
                 for (let y = 0; y < this.height; y++) {
                     for (let x = 0; x < this.width; x++) {
                         if (board[y][x] !== 0) {
                             const pieceValue = board[y][x];
                             const color = this.pieceColors[pieceValue] || COLORBLIND_COLORS[0];
-                            
+
                             // Fill block
                             this.ctx.fillStyle = `rgb(${color[0]},${color[1]},${color[2]})`;
                             this.ctx.fillRect(
@@ -726,7 +761,7 @@
                                 this.blockSize,
                                 this.blockSize
                             );
-                            
+
                             // Draw block border
                             this.ctx.strokeStyle = '#555';
                             this.ctx.lineWidth = 1;
@@ -739,13 +774,13 @@
                         }
                     }
                 }
-                
+
                 // Draw particles
                 for (const particle of this.activeParticles) {
                     // Calculate alpha based on lifetime
                     const alpha = particle.lifetime / 1.5;
                     if (alpha <= 0) continue;
-                    
+
                     this.ctx.fillStyle = `rgba(${particle.color[0]},${particle.color[1]},${particle.color[2]},${alpha})`;
                     this.ctx.beginPath();
                     this.ctx.arc(
@@ -759,7 +794,7 @@
                 }
             }
         }
-        
+
         // DQN Agent Implementation
         class DQNAgent {
             constructor(stateSize, actionSize) {
@@ -769,14 +804,14 @@
                 this.lastAction = null;
                 this.wasRandomAction = false;
                 this.lastQValues = null;
-                
+
                 // Metrics tracking
                 this.scoreHistory = [];
                 this.avgScore100 = 0;
                 this.maxScore = 0;
                 this.totalGames = 0;
             }
-            
+
             async loadModel(modelUrl, weightsUrl) {
                 try {
                     // Load the model from the JSON file
@@ -791,16 +826,16 @@
                     return false;
                 }
             }
-            
+
             predict(state) {
                 return tf.tidy(() => {
                     try {
                         // Convert state to tensor
                         const stateTensor = tf.tensor2d([state], [1, this.stateSize]);
-                        
+
                         // Get Q-values
                         const qValues = this.model.predict(stateTensor);
-                        
+
                         // Convert to array and return
                         return Array.from(qValues.dataSync());
                     } catch (error) {
@@ -810,28 +845,28 @@
                     }
                 });
             }
-            
+
             act(state) {
                 // Get Q-values
                 const qValues = this.predict(state);
                 this.lastQValues = Array.from(qValues);
-                
+
                 // Choose best action
                 const action = this.lastQValues.indexOf(Math.max(...this.lastQValues));
                 this.lastAction = action;
-                
+
                 return action;
             }
-            
+
             getActionExplanation(action) {
                 const rotation = Math.floor(action / 10);
                 const position = action % 10;
                 return `Rotate ${rotation} times, move to column ${position}`;
             }
-            
+
             getQValuesVisualization() {
                 if (!this.lastQValues) return null;
-                
+
                 const qData = [];
                 for (let i = 0; i < this.lastQValues.length; i++) {
                     const rotation = Math.floor(i / 10);
@@ -844,31 +879,31 @@
                         isBest: (i === this.lastAction)
                     });
                 }
-                
+
                 // Sort by Q-value (descending)
                 qData.sort((a, b) => b.qValue - a.qValue);
-                
+
                 return qData;
             }
-            
+
             updateScore(score) {
                 this.scoreHistory.push(score);
                 if (this.scoreHistory.length > 1000) {
                     this.scoreHistory = this.scoreHistory.slice(-1000);
                 }
-                
+
                 this.totalGames++;
-                
+
                 if (score > this.maxScore) {
                     this.maxScore = score;
                 }
-                
-                this.avgScore100 = this.scoreHistory.length > 0 
-                    ? this.scoreHistory.slice(-100).reduce((a, b) => a + b, 0) / Math.min(100, this.scoreHistory.length) 
+
+                this.avgScore100 = this.scoreHistory.length > 0
+                    ? this.scoreHistory.slice(-100).reduce((a, b) => a + b, 0) / Math.min(100, this.scoreHistory.length)
                     : 0;
             }
         }
-        
+
         // Constants
         const COLORBLIND_COLORS = [
             [0, 114, 178],    // Blue
@@ -879,7 +914,7 @@
             [213, 94, 0],     // Red-Orange
             [86, 180, 233]    // Light Blue
         ];
-        
+
         // Tetromino shapes
         const TETROMINOS = {
             'I': {
@@ -932,7 +967,7 @@
                 ]
             }
         };
-        
+
         // Game state variables
         let env = new TetrisEnv();
         const stateSize = 204;  // 20x10 board + 4 for piece encoding
@@ -943,7 +978,7 @@
         let lastUpdateTime = 0;
         let gamesPlayed = 0;
         let scores = [];
-        
+
         // UI elements
         const startButton = document.getElementById('start-button');
         const pauseButton = document.getElementById('pause-button');
@@ -955,21 +990,21 @@
         const progressBar = document.getElementById('progress-bar');
         const modelStatus = document.getElementById('model-status');
         const gameStatus = document.getElementById('game-status');
-        
+
         // Stats elements
         const scoreElement = document.getElementById('score');
         const linesElement = document.getElementById('lines');
         const gamesElement = document.getElementById('games');
         const maxScoreElement = document.getElementById('max-score');
         const avgScoreElement = document.getElementById('avg-score');
-        
+
         // Metrics elements
         const lastActionElement = document.getElementById('last-action');
         const holesElement = document.getElementById('holes');
         const bumpinessElement = document.getElementById('bumpiness');
         const avgHeightElement = document.getElementById('avg-height');
         const qValuesElement = document.getElementById('q-values');
-        
+
         // Helper function to read file as text
         function readFileAsText(file) {
             return new Promise((resolve, reject) => {
@@ -989,7 +1024,7 @@
                 reader.readAsArrayBuffer(file);
             });
         }
-        
+
         // Game setup
         function init() {
             env = new TetrisEnv();
@@ -998,7 +1033,7 @@
             updateUI();
             env.render();
         }
-        
+
         // Update UI stats
         function updateUI() {
             scoreElement.textContent = env.score;
@@ -1006,63 +1041,63 @@
             gamesElement.textContent = agent.totalGames;
             maxScoreElement.textContent = agent.maxScore;
             avgScoreElement.textContent = agent.avgScore100.toFixed(1);
-            
+
             // Update metrics
             holesElement.textContent = env.countHoles();
             bumpinessElement.textContent = env.getBumpiness();
-            
+
             const heights = env.getHeights();
             const avgHeight = heights.reduce((a, b) => a + b, 0) / heights.length;
             avgHeightElement.textContent = avgHeight.toFixed(2);
-            
+
             if (agent.lastAction !== null) {
                 lastActionElement.textContent = agent.getActionExplanation(agent.lastAction);
             }
-            
+
             // Update Q-values
             updateQValues();
         }
-        
+
         // Update Q-values display
         function updateQValues() {
             const qData = agent.getQValuesVisualization();
             if (!qData) return;
-            
+
             // Clear existing Q-values
             qValuesElement.innerHTML = '';
-            
+
             // Show top 5 Q-values
             for (let i = 0; i < Math.min(5, qData.length); i++) {
                 const data = qData[i];
                 const qValueItem = document.createElement('div');
                 qValueItem.className = `q-value-item ${data.isBest ? 'best-action' : ''}`;
-                
+
                 const actionText = document.createElement('span');
                 actionText.textContent = `Rot=${data.rotation}, Pos=${data.position}`;
-                
+
                 const qValueText = document.createElement('span');
                 qValueText.textContent = `Q=${data.qValue.toFixed(2)}`;
-                
+
                 qValueItem.appendChild(actionText);
                 qValueItem.appendChild(qValueText);
                 qValuesElement.appendChild(qValueItem);
             }
         }
-        
+
         // Game loop
         function gameLoop(timestamp) {
             if (!gameRunning) return;
-            
+
             // Calculate delta time
             const deltaTime = (timestamp - lastUpdateTime) / 1000;
             lastUpdateTime = timestamp;
-            
+
             // Update particles
             env.updateParticles(deltaTime);
-            
+
             // AI move at appropriate intervals
             progressBar.style.width = `${(progressBar.offsetWidth + 1) % 100}%`;
-            
+
             // If the game is over, reset it
             if (env.gameOver) {
                 agent.updateScore(env.score);
@@ -1074,21 +1109,21 @@
                 // Get AI action
                 const state = env.getState();
                 const action = agent.act(state);
-                
+
                 // Take the action
                 const result = env.step(action);
-                
+
                 // Update UI
                 updateUI();
             }
-            
+
             // Render the game
             env.render();
-            
+
             // Continue the game loop
             setTimeout(() => requestAnimationFrame(gameLoop), 1000 / gameSpeedMultiplier);
         }
-        
+
         // Event listeners
         startButton.addEventListener('click', () => {
             if (!gameRunning) {
@@ -1100,14 +1135,14 @@
                 requestAnimationFrame(gameLoop);
             }
         });
-        
+
         pauseButton.addEventListener('click', () => {
             gameRunning = false;
             pauseButton.disabled = true;
             startButton.disabled = false;
             gameStatus.textContent = "Game paused";
         });
-        
+
         resetButton.addEventListener('click', () => {
             gameRunning = false;
             pauseButton.disabled = true;
@@ -1115,17 +1150,17 @@
             gameStatus.textContent = "Game reset";
             init();
         });
-        
+
         speedSlider.addEventListener('input', () => {
             gameSpeedMultiplier = parseInt(speedSlider.value);
             speedValue.textContent = `${gameSpeedMultiplier}x`;
         });
-        
+
         // Model loading with the new approach
         modelUpload.addEventListener('change', () => {
             const modelFile = modelUpload.files[0];
             const weightsFile = weightsUpload.files[0];
-            
+
             if (modelFile && weightsFile) {
                 loadModelFiles(modelFile, weightsFile);
             } else {
@@ -1136,7 +1171,7 @@
         weightsUpload.addEventListener('change', () => {
             const modelFile = modelUpload.files[0];
             const weightsFile = weightsUpload.files[0];
-            
+
             if (modelFile && weightsFile) {
                 loadModelFiles(modelFile, weightsFile);
             }
@@ -1147,14 +1182,14 @@
             try {
                 modelStatus.textContent = "Loading model...";
                 gameStatus.textContent = "Reading model files...";
-                
+
                 // Read the model JSON
                 const modelJsonText = await readFileAsText(modelFile);
                 const modelJson = JSON.parse(modelJsonText);
-                
+
                 // Read the weights as ArrayBuffer
                 const weightData = await readFileAsArrayBuffer(weightsFile);
-                
+
                 // Create a proper ModelArtifacts object
                 const modelArtifacts = {
                     modelTopology: modelJson.modelTopology,
@@ -1166,28 +1201,28 @@
                     convertedBy: modelJson.convertedBy,
                     userDefinedMetadata: modelJson.userDefinedMetadata
                 };
-                
+
                 // Load the model using a single argument version of fromMemory
                 const model = await tf.loadLayersModel(tf.io.fromMemory(modelArtifacts));
-                
+
                 // Set to agent
                 agent.model = model;
-                
+
                 // Test prediction
                 const testState = new Array(stateSize).fill(0);
                 const qValues = tf.tidy(() => {
                     const stateTensor = tf.tensor2d([testState], [1, stateSize]);
                     return model.predict(stateTensor).dataSync();
                 });
-                
+
                 console.log("Model loaded successfully.");
                 console.log("Input shape:", model.inputs[0].shape);
                 console.log("Output shape:", model.outputs[0].shape);
                 console.log("Test prediction (first 5 values):", Array.from(qValues).slice(0, 5));
-                
+
                 modelStatus.textContent = "Model loaded successfully";
                 gameStatus.textContent = `Input: ${model.inputs[0].shape}, Output: ${model.outputs[0].shape}`;
-                
+
                 startButton.disabled = false;
                 pauseButton.disabled = true;
                 return true;
@@ -1198,10 +1233,10 @@
                 return false;
             }
         }
-        
+
         // Initialize the game
         init();
-        
+
         // Python to TensorFlow.js model conversion information:
         /*
         To convert a TensorFlow/Keras model from Python to TensorFlow.js:
@@ -1217,4 +1252,5 @@
         */
     </script>
 </body>
+
 </html>
