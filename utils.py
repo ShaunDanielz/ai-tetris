@@ -64,6 +64,8 @@ def convert_model_to_tfjs(h5_path, output_folder):
     Returns:
         bool: True if conversion was successful, False otherwise
     """
+    import time  # Add this import
+    
     if not TFJS_AVAILABLE:
         print("Cannot convert model: TensorFlow.js package not installed")
         print("Install with: pip install tensorflowjs")
@@ -73,12 +75,72 @@ def convert_model_to_tfjs(h5_path, output_folder):
     os.makedirs(output_folder, exist_ok=True)
     
     try:
-        # Convert the model
+        # Load the model
+        model = tf.keras.models.load_model(h5_path)
+        
+        # Print model information for debugging
+        print(f"\nModel Information for TensorFlow.js Export:")
+        print(f"Input shape: {model.input_shape}")
+        print(f"Output shape: {model.output_shape}")
+        
+        # Add additional metadata to help with loading
+        metadata = {
+            "modelType": "tetris_dqn",
+            "inputShape": list(map(lambda x: int(x) if x is not None else None, model.input_shape)),
+            "outputShape": list(map(lambda x: int(x) if x is not None else None, model.output_shape)),
+            "stateSize": int(model.input_shape[1]),
+            "actionSize": int(model.output_shape[1]),
+            "version": "1.0.0"
+        }
+        
+        # Convert the model with options that your version supports
         import tensorflowjs as tfjs
-        tfjs.converters.save_keras_model(tf.keras.models.load_model(h5_path), output_folder)
-        print(f"Model successfully converted to TensorFlow.js format")
+        
+        # Get the version of tensorflowjs to adapt parameters
+        tfjs_version = getattr(tfjs, "__version__", "unknown")
+        print(f"TensorFlow.js Converter version: {tfjs_version}")
+        
+        # Adapt conversion parameters based on available options
+        try:
+            # Try using the weight_shard_size_bytes parameter (newer versions)
+            tfjs.converters.save_keras_model(
+                model, 
+                output_folder,
+                weight_shard_size_bytes=1024 * 1024 * 4,  # 4MB per shard
+                metadata=metadata
+            )
+        except TypeError:
+            # Fall back to basic conversion if the above fails
+            tfjs.converters.save_keras_model(
+                model, 
+                output_folder,
+                metadata=metadata
+            )
+        
+        # Save a separate JSON file with additional metadata
+        import json
+        import datetime  # Alternative to time if needed
+        current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        with open(os.path.join(output_folder, "model_info.json"), "w") as f:
+            json.dump({
+                "metadata": metadata,
+                "stateSize": int(model.input_shape[1]),
+                "actionSize": int(model.output_shape[1]),
+                "modelVersion": "1.0.0",
+                "exportDate": current_time,
+                "loadingInstructions": "Load both model.json and weights files"
+            }, f, indent=2)
+        
+        print(f"\nModel successfully converted to TensorFlow.js format")
         print(f"Saved to: {output_folder}")
+        print(f"Model files:")
+        for file in os.listdir(output_folder):
+            print(f" - {file} ({os.path.getsize(os.path.join(output_folder, file)) / 1024:.1f} KB)")
+        
         return True
     except Exception as e:
         print(f"Error converting model: {e}")
+        import traceback
+        traceback.print_exc()
         return False

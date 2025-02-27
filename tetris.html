@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tetris DQN AI Player</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tensorflow/4.14.0/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.14.0/dist/tf.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -189,8 +189,14 @@
             </div>
             
             <div class="file-input">
-                <label for="weights-upload">Upload Weights:</label>
+                <label for="weights-upload">Upload Weights File (.bin):</label>
                 <input type="file" id="weights-upload" accept=".bin">
+            </div>
+            
+            <div class="model-info" id="model-info" style="margin-top: 10px; font-size: 12px; color: #aaa;">
+                1. First select the model.json file
+                2. Then select the matching weights.bin file
+                3. Both files must be selected before the model can be loaded
             </div>
             
             <button id="start-button" disabled>Start AI</button>
@@ -784,14 +790,20 @@
             
             predict(state) {
                 return tf.tidy(() => {
-                    // Convert state to tensor
-                    const stateTensor = tf.tensor2d([state], [1, this.stateSize]);
-                    
-                    // Get Q-values
-                    const qValues = this.model.predict(stateTensor);
-                    
-                    // Convert to array and return
-                    return qValues.dataSync();
+                    try {
+                        // Convert state to tensor
+                        const stateTensor = tf.tensor2d([state], [1, this.stateSize]);
+                        
+                        // Get Q-values
+                        const qValues = this.model.predict(stateTensor);
+                        
+                        // Convert to array and return
+                        return Array.from(qValues.dataSync());
+                    } catch (error) {
+                        console.error("Prediction error:", error);
+                        // Return fallback values
+                        return new Array(this.actionSize).fill(0);
+                    }
                 });
             }
             
@@ -954,6 +966,26 @@
         const avgHeightElement = document.getElementById('avg-height');
         const qValuesElement = document.getElementById('q-values');
         
+        // Helper function to read file as text
+        function readFileAsText(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = () => reject(reader.error);
+                reader.readAsText(file);
+            });
+        }
+
+        // Helper function to read file as ArrayBuffer
+        function readFileAsArrayBuffer(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = () => reject(reader.error);
+                reader.readAsArrayBuffer(file);
+            });
+        }
+        
         // Game setup
         function init() {
             env = new TetrisEnv();
@@ -1085,29 +1117,83 @@
             speedValue.textContent = `${gameSpeedMultiplier}x`;
         });
         
-        // Model loading
-        modelUpload.addEventListener('change', async (e) => {
-            if (e.target.files.length === 0) return;
+        // Model loading with the new approach
+        modelUpload.addEventListener('change', () => {
+            const modelFile = modelUpload.files[0];
+            const weightsFile = weightsUpload.files[0];
             
-            const file = e.target.files[0];
-            const modelUrl = URL.createObjectURL(file);
-            
-            modelStatus.textContent = "Loading model...";
-            
-            try {
-                // Load model architecture
-                const loaded = await agent.loadModel(modelUrl);
-                if (loaded) {
-                    startButton.disabled = false;
-                    modelStatus.textContent = "Model loaded successfully";
-                } else {
-                    modelStatus.textContent = "Failed to load model";
-                }
-            } catch (error) {
-                console.error("Error loading model:", error);
-                modelStatus.textContent = "Error loading model";
+            if (modelFile && weightsFile) {
+                loadModelFiles(modelFile, weightsFile);
+            } else {
+                modelStatus.textContent = "Both model.json and .bin files are required";
             }
         });
+
+        weightsUpload.addEventListener('change', () => {
+            const modelFile = modelUpload.files[0];
+            const weightsFile = weightsUpload.files[0];
+            
+            if (modelFile && weightsFile) {
+                loadModelFiles(modelFile, weightsFile);
+            }
+        });
+
+        // Function to load model from files
+        async function loadModelFiles(modelFile, weightsFile) {
+            try {
+                modelStatus.textContent = "Loading model...";
+                gameStatus.textContent = "Reading model files...";
+                
+                // Read the model JSON
+                const modelJsonText = await readFileAsText(modelFile);
+                const modelJson = JSON.parse(modelJsonText);
+                
+                // Read the weights as ArrayBuffer
+                const weightData = await readFileAsArrayBuffer(weightsFile);
+                
+                // Create a proper ModelArtifacts object
+                const modelArtifacts = {
+                    modelTopology: modelJson.modelTopology,
+                    weightsManifest: modelJson.weightsManifest,
+                    weightSpecs: modelJson.weightsManifest[0].weights,
+                    weightData: weightData,
+                    format: modelJson.format,
+                    generatedBy: modelJson.generatedBy,
+                    convertedBy: modelJson.convertedBy,
+                    userDefinedMetadata: modelJson.userDefinedMetadata
+                };
+                
+                // Load the model using a single argument version of fromMemory
+                const model = await tf.loadLayersModel(tf.io.fromMemory(modelArtifacts));
+                
+                // Set to agent
+                agent.model = model;
+                
+                // Test prediction
+                const testState = new Array(stateSize).fill(0);
+                const qValues = tf.tidy(() => {
+                    const stateTensor = tf.tensor2d([testState], [1, stateSize]);
+                    return model.predict(stateTensor).dataSync();
+                });
+                
+                console.log("Model loaded successfully.");
+                console.log("Input shape:", model.inputs[0].shape);
+                console.log("Output shape:", model.outputs[0].shape);
+                console.log("Test prediction (first 5 values):", Array.from(qValues).slice(0, 5));
+                
+                modelStatus.textContent = "Model loaded successfully";
+                gameStatus.textContent = `Input: ${model.inputs[0].shape}, Output: ${model.outputs[0].shape}`;
+                
+                startButton.disabled = false;
+                pauseButton.disabled = true;
+                return true;
+            } catch (error) {
+                console.error("Error loading model:", error);
+                modelStatus.textContent = "Error: " + error.message;
+                gameStatus.textContent = "Failed to load model";
+                return false;
+            }
+        }
         
         // Initialize the game
         init();

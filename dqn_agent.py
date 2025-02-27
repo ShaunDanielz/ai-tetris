@@ -223,3 +223,36 @@ class DQNAgent:
     def save(self, name):
         """Save model weights"""
         self.model.save_weights(name)
+
+    def save_full_model_for_web(self, name):
+        """Save the full model optimized for web export"""
+        model_dir = os.path.dirname(name)
+        if model_dir and not os.path.exists(model_dir):
+            os.makedirs(model_dir)
+        
+        # Set the optimizer to be serializable
+        self.model.compile(
+            loss='mse',
+            optimizer=tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
+        )
+        
+        # Save the model
+        self.model.save(name, save_format='h5')
+        
+        # Create a metadata file with information to help with web loading
+        metadata = {
+            "state_size": self.state_size,
+            "action_size": self.action_size,
+            "input_shape": [None, self.state_size],
+            "output_shape": [None, self.action_size],
+            "version": "1.0"
+        }
+        
+        metadata_path = name.replace(".h5", "_metadata.json")
+        with open(metadata_path, "w") as f:
+            import json
+            json.dump(metadata, f, indent=2)
+        
+        print(f"Full model saved to {name}")
+        print(f"Model metadata saved to {metadata_path}")
+        return name
