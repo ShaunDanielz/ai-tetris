@@ -354,14 +354,17 @@
             }
 
             _updateGhostPosition() {
-                this.ghostPosition = { x: this.currentPos.x, y: this.currentPos.y };
-
-                // Drop as far as possible
-                while (!this._checkCollision(0, this.ghostPosition.y - this.currentPos.y + 1)) {
-                    this.ghostPosition.y += 1;
+                let dropOffset = 0;
+                // Move the ghost down row by row until collision is detected
+                while (!this._checkCollision(0, dropOffset + 1)) {
+                    dropOffset++;
                 }
+                this.ghostPosition = {
+                    x: this.currentPos.x,
+                    y: this.currentPos.y + dropOffset
+                };
             }
-
+            
             _rotatePiece(clockwise = true) {
                 // Make a copy of the current piece
                 const originalPiece = JSON.parse(JSON.stringify(this.currentPiece));
