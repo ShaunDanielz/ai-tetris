@@ -300,10 +300,14 @@
                 this.gameOver = false;
                 
                 // Initialize colors for all possible piece values
+                // We'll assign fixed colors to specific piece values
                 this.pieceColors = {};
-                for (let i = 1; i <= 7; i++) {
-                    this.pieceColors[i] = COLORBLIND_COLORS[(i - 1) % COLORBLIND_COLORS.length];
-                }
+                
+                // Map each tetromino to its specific color
+                Object.keys(TETROMINOS).forEach((key, index) => {
+                    const pieceValue = Math.max(...TETROMINOS[key].shape.flat());
+                    this.pieceColors[pieceValue] = COLORBLIND_COLORS[index % COLORBLIND_COLORS.length];
+                });
                 
                 this.activeParticles = [];
                 this._newPiece();
@@ -321,10 +325,15 @@
                     y: 0
                 };
 
-                // Assign a color to this piece if not already assigned
+                // Each piece type should have a consistent color based on its value (1-7)
+                // Map the shape to its index in TETROMINOS
+                const pieceIndex = Object.keys(TETROMINOS).indexOf(randomKey);
+                // Use the piece value from the shape to ensure consistency
                 const pieceValue = Math.max(...this.currentPiece.flat());
-                if (pieceValue > 0 && !this.pieceColors[pieceValue]) {
-                    this.pieceColors[pieceValue] = COLORBLIND_COLORS[(pieceValue - 1) % COLORBLIND_COLORS.length];
+                
+                // Always assign color based on piece type (1-7)
+                if (pieceValue > 0) {
+                    this.pieceColors[pieceValue] = COLORBLIND_COLORS[pieceIndex % COLORBLIND_COLORS.length];
                 }
 
                 // Update ghost piece position
@@ -405,6 +414,9 @@
             }
 
             _mergePiece() {
+                // Save the original piece value for consistency
+                const originalPieceValue = Math.max(...this.currentPiece.flat());
+                
                 // This ensures the piece is properly merged with the board
                 for (let y = 0; y < this.currentPiece.length; y++) {
                     for (let x = 0; x < this.currentPiece[y].length; x++) {
@@ -415,17 +427,15 @@
                             // Only merge if within board boundaries
                             if (boardY >= 0 && boardY < this.height &&
                                 boardX >= 0 && boardX < this.width) {
-                                const pieceValue = this.currentPiece[y][x];
-                                this.board[boardY][boardX] = pieceValue;
-                                
-                                // Make sure we have a color for this piece value
-                                if (!this.pieceColors[pieceValue]) {
-                                    this.pieceColors[pieceValue] = COLORBLIND_COLORS[pieceValue % COLORBLIND_COLORS.length];
-                                }
+                                // Always use the original piece value for consistency
+                                this.board[boardY][boardX] = originalPieceValue;
                             }
                         }
                     }
                 }
+                
+                // Debug log to verify piece values
+                console.log('Merged piece with value:', originalPieceValue, 'Color:', this.pieceColors[originalPieceValue]);
             }
 
             _clearLines() {
@@ -930,15 +940,15 @@
             }
         }
 
-        // Constants
+                    // Constants
         const COLORBLIND_COLORS = [
-            [0, 114, 178],    // Blue
-            [230, 159, 0],    // Orange/Amber
-            [0, 158, 115],    // Green
-            [204, 121, 167],  // Purple
-            [0, 0, 0],        // Black
-            [213, 94, 0],     // Red-Orange
-            [86, 180, 233]    // Light Blue
+            [0, 114, 178],    // Blue - I piece
+            [230, 159, 0],    // Orange/Amber - J piece
+            [0, 158, 115],    // Green - L piece
+            [204, 121, 167],  // Purple - O piece
+            [213, 94, 0],     // Red-Orange - S piece
+            [86, 180, 233],   // Light Blue - T piece
+            [255, 105, 180]   // Pink - Z piece
         ];
 
         // Tetromino shapes
