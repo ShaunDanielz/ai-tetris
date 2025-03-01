@@ -630,15 +630,7 @@
                 const linesCleared = this._clearLines();
                 
                 // Verify no floating blocks
-                for (let x = 0; x < this.width; x++) {
-                    for (let y = this.height - 2; y >= 0; y--) { // Start from second-to-last row
-                        if (this.board[y][x] !== 0 && this.board[y + 1][x] === 0) {
-                            console.error(`Floating block detected at (${x}, ${y})`);
-                            console.log('Current board:', JSON.stringify(this.board));
-                        }
-                    }
-                }
-
+          
                 // Update score
                 if (linesCleared > 0) {
                     this.score += (1 << linesCleared) * 100; // 100, 200, 400, 800
