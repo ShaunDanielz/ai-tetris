@@ -432,10 +432,7 @@
                             }
                         }
                     }
-                }
-                
-                // Debug log to verify piece values
-                console.log('Merged piece with value:', originalPieceValue, 'Color:', this.pieceColors[originalPieceValue]);
+                }                
             }
 
             _clearLines() {
@@ -641,12 +638,6 @@
                 while (!this._checkCollision(0, 1)) {
                     this.currentPos.y += 1;
                 }
-
-                // Log before merging to inspect the state
-                console.log('Merging piece at:', JSON.stringify(this.currentPos));
-                console.log('Piece shape:', JSON.stringify(this.currentPiece));
-                console.log('Board state:', JSON.stringify(this.board));
-
                 // Check for floating blocks after merging
                 this._mergePiece();
                 const linesCleared = this._clearLines();
