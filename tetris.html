@@ -298,7 +298,13 @@
                 this.score = 0;
                 this.linesCleared = 0;
                 this.gameOver = false;
+                
+                // Initialize colors for all possible piece values
                 this.pieceColors = {};
+                for (let i = 1; i <= 7; i++) {
+                    this.pieceColors[i] = COLORBLIND_COLORS[(i - 1) % COLORBLIND_COLORS.length];
+                }
+                
                 this.activeParticles = [];
                 this._newPiece();
                 return this.getState();
@@ -315,10 +321,10 @@
                     y: 0
                 };
 
-                // Assign a random color to this piece
+                // Assign a color to this piece if not already assigned
                 const pieceValue = Math.max(...this.currentPiece.flat());
                 if (pieceValue > 0 && !this.pieceColors[pieceValue]) {
-                    this.pieceColors[pieceValue] = COLORBLIND_COLORS[Math.floor(Math.random() * COLORBLIND_COLORS.length)];
+                    this.pieceColors[pieceValue] = COLORBLIND_COLORS[(pieceValue - 1) % COLORBLIND_COLORS.length];
                 }
 
                 // Update ghost piece position
@@ -409,7 +415,13 @@
                             // Only merge if within board boundaries
                             if (boardY >= 0 && boardY < this.height &&
                                 boardX >= 0 && boardX < this.width) {
-                                this.board[boardY][boardX] = this.currentPiece[y][x];
+                                const pieceValue = this.currentPiece[y][x];
+                                this.board[boardY][boardX] = pieceValue;
+                                
+                                // Make sure we have a color for this piece value
+                                if (!this.pieceColors[pieceValue]) {
+                                    this.pieceColors[pieceValue] = COLORBLIND_COLORS[pieceValue % COLORBLIND_COLORS.length];
+                                }
                             }
                         }
                     }
@@ -737,7 +749,7 @@
                         for (let x = 0; x < this.currentPiece[y].length; x++) {
                             if (this.currentPiece[y][x] !== 0) {
                                 const pieceValue = this.currentPiece[y][x];
-                                const color = this.pieceColors[pieceValue] || COLORBLIND_COLORS[0];
+                                const color = this.pieceColors[pieceValue] || COLORBLIND_COLORS[pieceValue % COLORBLIND_COLORS.length];
 
                                 // Draw ghost piece as outline
                                 this.ctx.strokeStyle = `rgb(${color[0]},${color[1]},${color[2]})`;
@@ -761,7 +773,11 @@
                     for (let x = 0; x < this.width; x++) {
                         if (board[y][x] !== 0) {
                             const pieceValue = board[y][x];
-                            const color = this.pieceColors[pieceValue] || COLORBLIND_COLORS[0];
+                            // Ensure we always have a color, even if pieceColors doesn't have it
+                            if (!this.pieceColors[pieceValue]) {
+                                this.pieceColors[pieceValue] = COLORBLIND_COLORS[pieceValue % COLORBLIND_COLORS.length];
+                            }
+                            const color = this.pieceColors[pieceValue];
 
                             // Fill block
                             this.ctx.fillStyle = `rgb(${color[0]},${color[1]},${color[2]})`;
