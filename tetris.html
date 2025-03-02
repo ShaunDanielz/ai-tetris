@@ -170,6 +170,108 @@
             width: 0%;
             transition: width 0.5s;
         }
+
+        /* Toggle Switch Styles */
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+            margin-left: 10px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #555;
+            transition: .4s;
+            border-radius: 24px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .toggle-slider {
+            background-color: #4a6da7;
+        }
+
+        input:checked + .toggle-slider:before {
+            transform: translateX(26px);
+        }
+
+        .continuous-mode {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+        }
+
+        /* Game Over Dialog Styles */
+        .game-over-dialog {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .game-over-content {
+            background-color: #333;
+            padding: 20px;
+            border-radius: 5px;
+            width: 400px;
+            max-width: 90%;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            text-align: center;
+        }
+
+        .game-over-title {
+            font-size: 24px;
+            margin-bottom: 20px;
+            color: #ff5555;
+        }
+
+        .game-over-stats {
+            margin-bottom: 20px;
+        }
+
+        .game-over-btn {
+            padding: 10px 20px;
+            margin-top: 10px;
+            background-color: #4a6da7;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .game-over-btn:hover {
+            background-color: #5a7db7;
+        }
     </style>
 </head>
 
@@ -235,6 +337,14 @@
                 <span id="speed-value">5x</span>
             </div>
 
+            <div class="continuous-mode">
+                <label for="continuous-toggle">Continuous Mode:</label>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="continuous-toggle">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+
             <div class="status">
                 <div class="model-status" id="model-status">Model not loaded</div>
                 <div id="game-status">Game ready</div>
@@ -268,6 +378,28 @@
             <div class="q-values" id="q-values">
                 <!-- Q-values will be added here -->
             </div>
+        </div>
+    </div>
+
+    <!-- Game Over Dialog -->
+    <div class="game-over-dialog" id="game-over-dialog">
+        <div class="game-over-content">
+            <div class="game-over-title">Game Over</div>
+            <div class="game-over-stats">
+                <div class="stats-row">
+                    <span>Final Score:</span>
+                    <span id="final-score">0</span>
+                </div>
+                <div class="stats-row">
+                    <span>Lines Cleared:</span>
+                    <span id="final-lines">0</span>
+                </div>
+                <div class="stats-row">
+                    <span>Game Duration:</span>
+                    <span id="game-duration">0s</span>
+                </div>
+            </div>
+            <button class="game-over-btn" id="play-again-btn">Play Again</button>
         </div>
     </div>
 
@@ -931,7 +1063,7 @@
             }
         }
 
-                    // Constants
+        // Constants
         const COLORBLIND_COLORS = [
             [0, 114, 178],    // Blue - I piece
             [230, 159, 0],    // Orange/Amber - J piece
@@ -1005,6 +1137,8 @@
         let lastUpdateTime = 0;
         let gamesPlayed = 0;
         let scores = [];
+        let continuousMode = false; // Default is not continuous
+        let gameStartTime = 0; // Track when the current game started
 
         // UI elements
         const startButton = document.getElementById('start-button');
@@ -1017,6 +1151,9 @@
         const progressBar = document.getElementById('progress-bar');
         const modelStatus = document.getElementById('model-status');
         const gameStatus = document.getElementById('game-status');
+        const continuousToggle = document.getElementById('continuous-toggle');
+        const gameOverDialog = document.getElementById('game-over-dialog');
+        const playAgainBtn = document.getElementById('play-again-btn');
 
         // Stats elements
         const scoreElement = document.getElementById('score');
@@ -1024,6 +1161,9 @@
         const gamesElement = document.getElementById('games');
         const maxScoreElement = document.getElementById('max-score');
         const avgScoreElement = document.getElementById('avg-score');
+        const finalScoreElement = document.getElementById('final-score');
+        const finalLinesElement = document.getElementById('final-lines');
+        const gameDurationElement = document.getElementById('game-duration');
 
         // Metrics elements
         const lastActionElement = document.getElementById('last-action');
@@ -1052,11 +1192,19 @@
             });
         }
 
+        // Helper function to format time
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}m ${secs}s`;
+        }
+
         // Game setup
         function init() {
             env = new TetrisEnv();
             gamesPlayed = 0;
             scores = [];
+            gameStartTime = Date.now();
             updateUI();
             env.render();
         }
@@ -1083,6 +1231,26 @@
 
             // Update Q-values
             updateQValues();
+        }
+
+        // Show game over dialog
+        function showGameOverDialog() {
+            const gameEndTime = Date.now();
+            const gameDuration = (gameEndTime - gameStartTime) / 1000; // in seconds
+            
+            finalScoreElement.textContent = env.score;
+            finalLinesElement.textContent = env.linesCleared;
+            gameDurationElement.textContent = formatTime(gameDuration);
+            
+            gameOverDialog.style.display = 'flex';
+            gameRunning = false;
+            pauseButton.disabled = true;
+            startButton.disabled = !agent.model;
+        }
+
+        // Hide game over dialog
+        function hideGameOverDialog() {
+            gameOverDialog.style.display = 'none';
         }
 
         // Update Q-values display
@@ -1125,13 +1293,23 @@
             // AI move at appropriate intervals
             progressBar.style.width = `${(progressBar.offsetWidth + 1) % 100}%`;
 
-            // If the game is over, reset it
+            // If the game is over
             if (env.gameOver) {
                 agent.updateScore(env.score);
                 scores.push(env.score);
                 gamesPlayed++;
-                env.reset();
-                updateUI();
+                
+                if (continuousMode) {
+                    // In continuous mode, just reset and continue
+                    env.reset();
+                    gameStartTime = Date.now();
+                    updateUI();
+                } else {
+                    // In single game mode, show the game over dialog
+                    showGameOverDialog();
+                    updateUI();
+                    return; // Exit the game loop
+                }
             } else {
                 // Get AI action
                 const state = env.getState();
@@ -1154,7 +1332,9 @@
         // Event listeners
         startButton.addEventListener('click', () => {
             if (!gameRunning) {
+                hideGameOverDialog();
                 gameRunning = true;
+                gameStartTime = Date.now();
                 lastUpdateTime = performance.now();
                 pauseButton.disabled = false;
                 startButton.disabled = true;
@@ -1171,6 +1351,7 @@
         });
 
         resetButton.addEventListener('click', () => {
+            hideGameOverDialog();
             gameRunning = false;
             pauseButton.disabled = true;
             startButton.disabled = !agent.model;
@@ -1181,6 +1362,23 @@
         speedSlider.addEventListener('input', () => {
             gameSpeedMultiplier = parseInt(speedSlider.value);
             speedValue.textContent = `${gameSpeedMultiplier}x`;
+        });
+
+        continuousToggle.addEventListener('change', () => {
+            continuousMode = continuousToggle.checked;
+            console.log("Continuous mode:", continuousMode ? "ON" : "OFF");
+        });
+
+        playAgainBtn.addEventListener('click', () => {
+            hideGameOverDialog();
+            gameStartTime = Date.now();
+            env.reset();
+            updateUI();
+            gameRunning = true;
+            pauseButton.disabled = false;
+            startButton.disabled = true;
+            gameStatus.textContent = "Game running";
+            requestAnimationFrame(gameLoop);
         });
 
         // Model loading with the new approach
