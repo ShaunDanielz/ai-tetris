@@ -246,6 +246,27 @@
             max-width: 90%;
             box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
             text-align: center;
+            position: relative;
+        }
+        
+        .close-button {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 20px;
+            color: #aaa;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0;
+            width: 24px;
+            height: 24px;
+            line-height: 24px;
+            text-align: center;
+        }
+        
+        .close-button:hover {
+            color: #fff;
         }
 
         .game-over-title {
@@ -260,7 +281,7 @@
 
         .game-over-btn {
             padding: 10px 20px;
-            margin-top: 10px;
+            margin: 10px 5px 0;
             background-color: #4a6da7;
             color: white;
             border: none;
@@ -271,6 +292,20 @@
 
         .game-over-btn:hover {
             background-color: #5a7db7;
+        }
+        
+        .game-over-btn.cancel {
+            background-color: #666;
+        }
+        
+        .game-over-btn.cancel:hover {
+            background-color: #777;
+        }
+        
+        .game-over-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
         }
     </style>
 </head>
@@ -384,6 +419,7 @@
     <!-- Game Over Dialog -->
     <div class="game-over-dialog" id="game-over-dialog">
         <div class="game-over-content">
+            <button class="close-button" id="close-dialog-x">&times;</button>
             <div class="game-over-title">Game Over</div>
             <div class="game-over-stats">
                 <div class="stats-row">
@@ -399,7 +435,10 @@
                     <span id="game-duration">0s</span>
                 </div>
             </div>
-            <button class="game-over-btn" id="play-again-btn">Play Again</button>
+            <div class="game-over-buttons">
+                <button class="game-over-btn" id="play-again-btn">Play Again</button>
+                <button class="game-over-btn cancel" id="close-dialog-btn">Close</button>
+            </div>
         </div>
     </div>
 
@@ -1154,6 +1193,8 @@
         const continuousToggle = document.getElementById('continuous-toggle');
         const gameOverDialog = document.getElementById('game-over-dialog');
         const playAgainBtn = document.getElementById('play-again-btn');
+        const closeDialogBtn = document.getElementById('close-dialog-btn');
+        const closeDialogX = document.getElementById('close-dialog-x');
 
         // Stats elements
         const scoreElement = document.getElementById('score');
@@ -1379,6 +1420,16 @@
             startButton.disabled = true;
             gameStatus.textContent = "Game running";
             requestAnimationFrame(gameLoop);
+        });
+        
+        // Close dialog with the Close button
+        closeDialogBtn.addEventListener('click', () => {
+            hideGameOverDialog();
+        });
+        
+        // Close dialog with the X button
+        closeDialogX.addEventListener('click', () => {
+            hideGameOverDialog();
         });
 
         // Model loading with the new approach
